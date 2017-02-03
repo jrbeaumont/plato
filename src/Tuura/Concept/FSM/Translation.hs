@@ -80,9 +80,7 @@ missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
 
 addMissingSignals :: Ord a => [[Transition a]] -> [[MaybeTransition a]]
 addMissingSignals x = zipWith (++) (newTransitions x) (toMaybeTransition x)
-
-newTransitions :: Ord a => [[Transition a]] -> [[MaybeTransition a]]
-newTransitions = (((map . map) ((flip MaybeTransition) Nothing)) . missingSignals)
+    where newTransitions = (((map . map) ((flip MaybeTransition) Nothing)) . missingSignals)
 
 transitionList :: Eq a => [([Transition a], Transition a)] -> [[Transition a]]
 transitionList =  (map fullList) . removeDupes
