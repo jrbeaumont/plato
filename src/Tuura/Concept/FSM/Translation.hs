@@ -16,20 +16,28 @@ instance Show a => Show (Transition a) where
 data MaybeTransition a = MaybeTransition
     {
         msignal   :: a,
-        mnewValue :: Maybe Bool -- Transition x True corresponds to x+
+        mnewValue :: Tristate -- Transition x True corresponds to x+
     }
     deriving Eq
 
 instance Show a => Show (MaybeTransition a) where
-    show (MaybeTransition s (Just True) ) = show s ++ "+"
-    show (MaybeTransition s (Just False)) = show s ++ "-"
-    show (MaybeTransition s Nothing     ) = show s ++ "x"
+    show (MaybeTransition s (Tristate (Just True) )) = show s ++ "+"
+    show (MaybeTransition s (Tristate (Just False))) = show s ++ "-"
+    show (MaybeTransition s (Tristate Nothing     )) = show s ++ "x"
 
 rise :: a -> Transition a
 rise a = Transition a True
 
 fall :: a -> Transition a
 fall a = Transition a False
+
+data Tristate = Tristate (Maybe Bool)
+    deriving Eq
+
+instance Show (Tristate) where
+    show (Tristate (Just True) ) = "1"
+    show (Tristate (Just False)) = "0"
+    show (Tristate Nothing     ) = "x"
 
 --data Fsmstate a = Fsmstate
 --    {
@@ -47,9 +55,9 @@ instance Show a => Show (Fsmstate a) where
 
 data FsmArcX a = FsmArcX
     {
-        sourceEncoding :: [Char],
+        sourceEncoding :: [Tristate],
         trans :: Transition a,
-        targetEncoding :: [Char]
+        targetEncoding :: [Tristate]
     }
 
 instance Show a => Show (FsmArcX a) where
@@ -79,14 +87,11 @@ boolToChar Nothing      = 'x'
 sortTransitions :: Ord a => [MaybeTransition a] -> [MaybeTransition a]
 sortTransitions = sortBy (comparing msignal)
 
-intsFromTransitions :: [MaybeTransition a] -> [Char]
-intsFromTransitions = map (boolToChar . mnewValue)
-
 fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
 
 fullListm :: ([MaybeTransition a], Transition a) -> [MaybeTransition a]
-fullListm (l,t) = ((liftM2 MaybeTransition signal (Just . newValue)) t):l
+fullListm (l,t) = ((liftM2 MaybeTransition signal (Tristate . Just . newValue)) t):l
 
 -- Given [([a], b)], remove all b from a
 removeDupes :: Eq a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
@@ -94,7 +99,7 @@ removeDupes :: Eq a => [([Transition a], Transition a)] -> [([Transition a], Tra
 removeDupes = map (ap ((,) . ap (filter . (. signal) . (/=) . signal . snd) fst) snd)
 
 toMaybeTransition :: [[Transition a]] -> [[MaybeTransition a]]
-toMaybeTransition = (map . map) (liftM2 MaybeTransition signal (Just . newValue))
+toMaybeTransition = (map . map) (liftM2 MaybeTransition signal (Tristate . Just . newValue))
 
 onlySignals :: Eq a => [[Transition a]] -> [[a]]
 onlySignals = map (map signal)
@@ -108,16 +113,16 @@ missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
 addMissingSignals :: Ord a => [([Transition a], Transition a)] -> [([MaybeTransition a], Transition a)]
 addMissingSignals x = zip (zipWith (++) (newTransitions x) (toMaybeTransition oldTransitions)) (map snd x)
     where oldTransitions = map fst x
-          newTransitions = (((map . map) ((flip MaybeTransition) Nothing)) . missingSignals . transitionList)
+          newTransitions = (((map . map) ((flip MaybeTransition) (Tristate Nothing))) . missingSignals . transitionList)
           transitionList =  (map fullList)
 
 readyForEncoding :: Ord a => [([Transition a], Transition a)] -> [([MaybeTransition a], Transition a)]
 readyForEncoding =  addMissingSignals . removeDupes
 
-encode :: Ord a => [MaybeTransition a] -> [Char]
-encode  = intsFromTransitions . sortTransitions
+encode :: Ord a => [MaybeTransition a] -> [Tristate]
+encode  = (map mnewValue) . sortTransitions
 
-constructTargetEncodings :: Ord a => [([Transition a], Transition a)] -> [[Char]]
+constructTargetEncodings :: Ord a => [([Transition a], Transition a)] -> [[Tristate]]
 constructTargetEncodings = (map encode) . (map fullListm) . readyForEncoding
 
 flipTransition :: Transition a -> Transition a
@@ -126,7 +131,7 @@ flipTransition x = Transition (signal x) (not (newValue x))
 flipTransitions :: ([Transition a], Transition a) -> ([Transition a], Transition a)
 flipTransitions x = (fst x, flipTransition (snd x))
 
-constructSourceEncodings :: Ord a => [([Transition a], Transition a)] -> [[Char]]
+constructSourceEncodings :: Ord a => [([Transition a], Transition a)] -> [[Tristate]]
 constructSourceEncodings = (map encode) . (map fullListm) . readyForEncoding . (map flipTransitions)
 
 activeTransitions :: Ord a => [([Transition a], Transition a)] -> [Transition a]
@@ -135,7 +140,7 @@ activeTransitions = (map (snd)) .  readyForEncoding
 createFsmstate :: [Char] -> [Char] -> Transition a -> Fsmstate a
 createFsmstate senc tenc trans = Fsmstate senc ([(trans, tenc)])
 
-createArc :: [Char] -> [Char] -> Transition a -> FsmArcX a
+createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
 createArc senc tenc trans = FsmArcX senc trans tenc
 
 createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
