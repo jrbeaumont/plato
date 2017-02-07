@@ -2,7 +2,7 @@ import Data.List
 import Data.Ord (comparing)
 import Control.Monad
 import Data.Char  (digitToInt)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Numeric    (readInt)
 
 data Transition a = Transition
@@ -76,6 +76,7 @@ andrey a b c d = [([rise a, fall c, rise d], rise c),
 trs a b c = [rise a, fall b, rise c]
 
 y = andrey A B C D
+b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 
 
 sortTransitions :: Ord a => [MaybeTransition a] -> [MaybeTransition a]
@@ -172,6 +173,11 @@ createAllArcs = expandAllXs . createArcs
 readBin :: Integral a => String -> Maybe a
 readBin = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 
---intArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
---intArcs x = map (FsmArc ((encToInt . sourceEncodingx) arcs) (transx arcs) ((encToInt . targetEncodingx) arcs)) x
---    where arcs = createAllArcs x
+encToInt :: [Tristate] -> Int
+encToInt enc = fromMaybe 0 ((readBin . concatMap show . reverse) enc)
+
+fsmarcxToFsmarc :: FsmArcX a -> FsmArc a
+fsmarcxToFsmarc arc = FsmArc ((encToInt . sourceEncodingx) arc) (transx arc) ((encToInt . targetEncodingx) arc)
+
+intArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
+intArcs x = map fsmarcxToFsmarc (createAllArcs x)
