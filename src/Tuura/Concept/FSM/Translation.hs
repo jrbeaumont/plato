@@ -41,13 +41,23 @@ instance Show (Tristate) where
 
 data FsmArcX a = FsmArcX
     {
-        sourceEncoding :: [Tristate],
-        trans :: Transition a,
-        targetEncoding :: [Tristate]
+        sourceEncodingx :: [Tristate],
+        transx :: Transition a,
+        targetEncodingx :: [Tristate]
     }
 
 instance Show a => Show (FsmArcX a) where
     show (FsmArcX senc tran tenc) = "(" ++ show senc ++ " " ++ show tran ++ " " ++ show tenc ++ ")\n"
+
+data FsmArc a = FsmArc
+    {
+        sourceEncoding :: Int,
+        trans :: Transition a,
+        targetEncoding :: Int
+    }
+
+instance Show a => Show (FsmArc a) where
+    show (FsmArc senc tran tenc) = "(s" ++ show senc ++ " " ++ show tran ++ " s" ++ show tenc ++ ")\n"
 
 data Signal = A | B | C | D deriving (Eq, Ord, Show, Enum)
 
@@ -119,7 +129,7 @@ activeTransitions :: Ord a => [([Transition a], Transition a)] -> [Transition a]
 activeTransitions = (map (snd)) .  readyForEncoding
 
 createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
-createArc senc tenc trans = FsmArcX senc trans tenc
+createArc senc tenc transx = FsmArcX senc transx tenc
 
 createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createArcs xs = zipWith3 (createArc) (constructSourceEncodings xs) (constructTargetEncodings xs) (activeTransitions xs)
@@ -130,21 +140,21 @@ numOfX = (length . filter (== (Tristate Nothing)))
 replaceAtIndex item ls n = a ++ (item:b) where (a, (_:b)) = splitAt n ls
 
 expandSourceX :: FsmArcX a -> [FsmArcX a]
-expandSourceX xs = case elemIndex (Tristate Nothing) (sourceEncoding xs) of
+expandSourceX xs = case elemIndex (Tristate Nothing) (sourceEncodingx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (sourceEncoding xs) n),
-                           makeArc (replaceAtIndex (Tristate (Just False)) (sourceEncoding xs) n)]
-                               where makeArc s = FsmArcX s (trans xs) (targetEncoding xs)
+               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (sourceEncodingx xs) n),
+                           makeArc (replaceAtIndex (Tristate (Just False)) (sourceEncodingx xs) n)]
+                               where makeArc s = FsmArcX s (transx xs) (targetEncodingx xs)
 
 expandSourceXs :: [FsmArcX a] -> [FsmArcX a]
 expandSourceXs = concatMap expandSourceX
 
 expandTargetX :: FsmArcX a -> [FsmArcX a]
-expandTargetX xs = case elemIndex (Tristate Nothing) (targetEncoding xs) of
+expandTargetX xs = case elemIndex (Tristate Nothing) (targetEncodingx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (targetEncoding xs) n),
-                           makeArc (replaceAtIndex (Tristate (Just False)) (targetEncoding xs) n)]
-                               where makeArc s = FsmArcX (sourceEncoding xs) (trans xs) s
+               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (targetEncodingx xs) n),
+                           makeArc (replaceAtIndex (Tristate (Just False)) (targetEncodingx xs) n)]
+                               where makeArc s = FsmArcX (sourceEncodingx xs) (transx xs) s
 
 expandTargetXs :: [FsmArcX a] -> [FsmArcX a]
 expandTargetXs = concatMap expandTargetX
@@ -154,3 +164,7 @@ expandAllXs = expandTargetXs . expandSourceXs
 
 createAllArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createAllArcs = expandAllXs . createArcs
+
+--intArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
+--intArcs x = map (FsmArc ((encToInt . sourceEncodingx) arcs) (transx arcs) ((encToInt . targetEncodingx) arcs)) x
+--    where arcs = createAllArcs x
