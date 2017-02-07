@@ -4,6 +4,7 @@ import Control.Monad
 import Data.Char  (digitToInt)
 import Data.Maybe (fromMaybe, listToMaybe)
 import Numeric    (readInt)
+import Text.Printf
 
 data Transition a = Transition
     {
@@ -60,7 +61,7 @@ data FsmArc a = FsmArc
     }
 
 instance Show a => Show (FsmArc a) where
-    show (FsmArc senc tran tenc) = "(s" ++ show senc ++ " " ++ show tran ++ " s" ++ show tenc ++ ")\n"
+    show (FsmArc senc tran tenc) = "s" ++ show senc ++ " " ++ show tran ++ " s" ++ show tenc
 
 data Signal = A | B | C | D deriving (Eq, Ord, Show, Enum)
 
@@ -78,6 +79,10 @@ trs a b c = [rise a, fall b, rise c]
 y = andrey A B C D
 b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 
+genFSM :: (Show a, Ord a) => [([Transition a], Transition a)] -> String
+genFSM causality = printf tmpl (unlines showArcs) ("s" ++ show (sourceEncoding (head arcs)))
+    where arcs = intArcs causality
+          showArcs = map show arcs
 
 sortTransitions :: Ord a => [MaybeTransition a] -> [MaybeTransition a]
 sortTransitions = sortBy (comparing msignal)
@@ -138,9 +143,6 @@ createArc senc tenc transx = FsmArcX senc transx tenc
 createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createArcs xs = zipWith3 (createArc) (constructSourceEncodings xs) (constructTargetEncodings xs) (activeTransitions xs)
    
-numOfX :: [Tristate] -> Int
-numOfX = (length . filter (== (Tristate Nothing)))
-
 replaceAtIndex item ls n = a ++ (item:b) where (a, (_:b)) = splitAt n ls
 
 expandSourceX :: FsmArcX a -> [FsmArcX a]
@@ -181,3 +183,6 @@ fsmarcxToFsmarc arc = FsmArc ((encToInt . sourceEncodingx) arc) (transx arc) ((e
 
 intArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
 intArcs x = map fsmarcxToFsmarc (createAllArcs x)
+
+tmpl :: String
+tmpl = unlines [".state graph", "%s.marking{%s}", ".end"]
