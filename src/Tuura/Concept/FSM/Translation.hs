@@ -1,6 +1,9 @@
 import Data.List
 import Data.Ord (comparing)
 import Control.Monad
+import Data.Char  (digitToInt)
+import Data.Maybe (listToMaybe)
+import Numeric    (readInt)
 
 data Transition a = Transition
     {
@@ -164,6 +167,10 @@ expandAllXs = expandTargetXs . expandSourceXs
 
 createAllArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createAllArcs = expandAllXs . createArcs
+
+-- http://stackoverflow.com/questions/5921573/convert-a-string-representing-a-binary-number-to-a-base-10-string-haskell
+readBin :: Integral a => String -> Maybe a
+readBin = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 
 --intArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
 --intArcs x = map (FsmArc ((encToInt . sourceEncodingx) arcs) (transx arcs) ((encToInt . targetEncodingx) arcs)) x
