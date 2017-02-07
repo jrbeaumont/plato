@@ -39,20 +39,6 @@ instance Show (Tristate) where
     show (Tristate (Just False)) = "0"
     show (Tristate Nothing     ) = "x"
 
---data Fsmstate a = Fsmstate
---    {
---        encoding :: Int,
---        arcs :: [(Transition a, Int)]
---    }
-data Fsmstate a = Fsmstate
-    {
-        encoding :: Tristate,
-        arcs :: [(Transition a, Tristate)]    -- (Transition, Target Encoding)
-    }
-
-instance Show a => Show (Fsmstate a) where
-    show (Fsmstate enc arc) = show enc ++ " " ++ show arc
-
 data FsmArcX a = FsmArcX
     {
         sourceEncoding :: [Tristate],
@@ -78,11 +64,6 @@ trs a b c = [rise a, fall b, rise c]
 
 y = andrey A B C D
 
-
-boolToChar :: Maybe Bool -> Char
-boolToChar (Just True)  = '1'
-boolToChar (Just False) = '0'
-boolToChar Nothing      = 'x'
 
 sortTransitions :: Ord a => [MaybeTransition a] -> [MaybeTransition a]
 sortTransitions = sortBy (comparing msignal)
@@ -137,9 +118,6 @@ constructSourceEncodings = (map encode) . (map fullListm) . readyForEncoding . (
 activeTransitions :: Ord a => [([Transition a], Transition a)] -> [Transition a]
 activeTransitions = (map (snd)) .  readyForEncoding
 
---createFsmstate :: [Char] -> [Char] -> Transition a -> Fsmstate a
---createFsmstate senc tenc trans = Fsmstate senc ([(trans, tenc)])
-
 createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
 createArc senc tenc trans = FsmArcX senc trans tenc
 
@@ -174,6 +152,5 @@ expandTargetXs = concatMap expandTargetX
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
 expandAllXs = expandTargetXs . expandSourceXs
 
-
---createTargetStates :: Ord a => [([Transition a], Transition a)] -> [Fsmstate a]
---createTargetStates = (map fullListm) . addMissingSignals . removeDupes
+createAllArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
+createAllArcs = expandAllXs . createArcs
