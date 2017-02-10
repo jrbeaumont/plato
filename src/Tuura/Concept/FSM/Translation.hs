@@ -45,6 +45,10 @@ instance Show Tristate where
     show (Tristate (Just False)) = "0"
     show (Tristate Nothing     ) = "x"
 
+triTrue = Tristate (Just True)
+triFalse = Tristate (Just False)
+triX = Tristate Nothing
+
 data FsmArcX a = FsmArcX
     {
         srcEncx :: [Tristate],
@@ -111,7 +115,7 @@ addMissingSignals :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 addMissingSignals x = zip (zipWith (++) newTransitions oldTransitions) (map snd noDupes)
     where noDupes = removeDupes x
           oldTransitions = map (map toTransitionX . fst) noDupes
-          newTransitions = ((map . map) (flip TransitionX (Tristate Nothing)) . missingSignals . transitionList) noDupes
+          newTransitions = ((map . map) (flip TransitionX triX) . missingSignals . transitionList) noDupes
           transitionList =  map fullList
           missingSignals y = map (getAllSignals y \\) (onlySignals y)
 
@@ -132,28 +136,28 @@ createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
-expandSourceX :: FsmArcX a -> [FsmArcX a]
-expandSourceX xs = case elemIndex (Tristate Nothing) (srcEncx xs) of
+expandSrcX :: FsmArcX a -> [FsmArcX a]
+expandSrcX xs = case elemIndex triX (srcEncx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (srcEncx xs) n),
-                           makeArc (replaceAtIndex (Tristate (Just False)) (srcEncx xs) n)]
+               Just n  -> [makeArc (replaceAtIndex triTrue (srcEncx xs) n),
+                           makeArc (replaceAtIndex triFalse (srcEncx xs) n)]
                                where makeArc s = FsmArcX s (transx xs) (destEncx xs)
 
-expandSourceXs :: [FsmArcX a] -> [FsmArcX a]
-expandSourceXs = concatMap expandSourceX
+expandSrcXs :: [FsmArcX a] -> [FsmArcX a]
+expandSrcXs = concatMap expandSrcX
 
-expandTargetX :: FsmArcX a -> [FsmArcX a]
-expandTargetX xs = case elemIndex (Tristate Nothing) (destEncx xs) of
+expandDestX :: FsmArcX a -> [FsmArcX a]
+expandDestX xs = case elemIndex triX (destEncx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (destEncx xs) n),
-                           makeArc (replaceAtIndex (Tristate (Just False)) (destEncx xs) n)]
+               Just n  -> [makeArc (replaceAtIndex triTrue (destEncx xs) n),
+                           makeArc (replaceAtIndex triFalse (destEncx xs) n)]
                                where makeArc = FsmArcX (srcEncx xs) (transx xs)
 
-expandTargetXs :: [FsmArcX a] -> [FsmArcX a]
-expandTargetXs = concatMap expandTargetX
+expandDestXs :: [FsmArcX a] -> [FsmArcX a]
+expandDestXs = concatMap expandDestX
 
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
-expandAllXs = expandTargetXs . expandSourceXs
+expandAllXs = expandDestXs . expandSrcXs
 
 createAllArcs :: Ord a => Causality a -> [FsmArcX a]
 createAllArcs = expandAllXs . createArcs
