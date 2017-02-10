@@ -92,15 +92,15 @@ fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
 
 fullListm :: ([TransitionX a], Transition a) -> [TransitionX a]
-fullListm (l,t) = ((liftM2 TransitionX signal (Tristate . Just . newValue)) t):l
+fullListm (l,t) = (toTransitionX t):l
 
 -- Given [([a], b)], remove all b from a
 removeDupes :: Eq a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
 --(filter ((/= ((signal . snd) x)) . signal) (fst x), snd x)
 removeDupes = map (ap ((,) . ap (filter . (. signal) . (/=) . signal . snd) fst) snd)
 
-toMaybeTransition :: [[Transition a]] -> [[TransitionX a]]
-toMaybeTransition = (map . map) (liftM2 TransitionX signal (Tristate . Just . newValue))
+toTransitionX :: Transition a -> TransitionX a
+toTransitionX = (liftM2 TransitionX signal (Tristate . Just . newValue))
 
 onlySignals :: Eq a => [[Transition a]] -> [[a]]
 onlySignals = map (map signal)
@@ -112,7 +112,7 @@ missingSignals :: Ord a => [[Transition a]] -> [[a]]
 missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
 
 addMissingSignals :: Ord a => [([Transition a], Transition a)] -> [([TransitionX a], Transition a)]
-addMissingSignals x = zip (zipWith (++) (newTransitions x) (toMaybeTransition oldTransitions)) (map snd x)
+addMissingSignals x = zip (zipWith (++) (newTransitions x) ((map . map) toTransitionX oldTransitions)) (map snd x)
     where oldTransitions = map fst x
           newTransitions = (((map . map) ((flip TransitionX) (Tristate Nothing))) . missingSignals . transitionList)
           transitionList =  (map fullList)
