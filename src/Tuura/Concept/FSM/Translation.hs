@@ -6,6 +6,8 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import Numeric    (readInt)
 import Text.Printf
 
+type Causality a = [([Transition a], Transition a)]
+
 data Transition a = Transition
     {
         signal   :: a,
@@ -79,7 +81,7 @@ trs a b c = [rise a, fall b, rise c]
 y = andrey A B C D
 b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 
-genFSM :: (Show a, Ord a) => [([Transition a], Transition a)] -> String
+genFSM :: (Show a, Ord a) => Causality a -> String
 genFSM causality = printf tmpl (unlines showArcs) initialMarking
     where arcs = intArcs causality
           showArcs = map show arcs
@@ -95,7 +97,7 @@ fullListm :: ([TransitionX a], Transition a) -> [TransitionX a]
 fullListm (l,t) = (toTransitionX t):l
 
 -- Given [([a], b)], remove all b from a
-removeDupes :: Eq a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
+removeDupes :: Eq a => Causality a -> Causality a
 --(filter ((/= ((signal . snd) x)) . signal) (fst x), snd x)
 removeDupes = map (ap ((,) . ap (filter . (. signal) . (/=) . signal . snd) fst) snd)
 
@@ -111,19 +113,19 @@ getAllSignals = (sort . foldl union ([]) . onlySignals)
 missingSignals :: Ord a => [[Transition a]] -> [[a]]
 missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
 
-addMissingSignals :: Ord a => [([Transition a], Transition a)] -> [([TransitionX a], Transition a)]
+addMissingSignals :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 addMissingSignals x = zip (zipWith (++) (newTransitions x) ((map . map) toTransitionX oldTransitions)) (map snd x)
     where oldTransitions = map fst x
           newTransitions = (((map . map) ((flip TransitionX) (Tristate Nothing))) . missingSignals . transitionList)
           transitionList =  (map fullList)
 
-readyForEncoding :: Ord a => [([Transition a], Transition a)] -> [([TransitionX a], Transition a)]
+readyForEncoding :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 readyForEncoding =  addMissingSignals . removeDupes
 
 encode :: Ord a => [TransitionX a] -> [Tristate]
 encode  = (map mnewValue) . sortTransitions
 
-constructTargetEncodings :: Ord a => [([Transition a], Transition a)] -> [[Tristate]]
+constructTargetEncodings :: Ord a => Causality a -> [[Tristate]]
 constructTargetEncodings = (map encode) . (map fullListm) . readyForEncoding
 
 flipTransition :: Transition a -> Transition a
@@ -132,16 +134,16 @@ flipTransition x = Transition (signal x) (not (newValue x))
 flipTransitions :: ([Transition a], Transition a) -> ([Transition a], Transition a)
 flipTransitions x = (fst x, flipTransition (snd x))
 
-constructSourceEncodings :: Ord a => [([Transition a], Transition a)] -> [[Tristate]]
+constructSourceEncodings :: Ord a => Causality a -> [[Tristate]]
 constructSourceEncodings = (map encode) . (map fullListm) . readyForEncoding . (map flipTransitions)
 
-activeTransitions :: Ord a => [([Transition a], Transition a)] -> [Transition a]
+activeTransitions :: Ord a => Causality a -> [Transition a]
 activeTransitions = (map (snd)) .  readyForEncoding
 
 createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
 createArc senc tenc transx = FsmArcX senc transx tenc
 
-createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
+createArcs :: Ord a => Causality a -> [FsmArcX a]
 createArcs xs = zipWith3 (createArc) (constructSourceEncodings xs) (constructTargetEncodings xs) (activeTransitions xs)
    
 replaceAtIndex item ls n = a ++ (item:b)
@@ -170,7 +172,7 @@ expandTargetXs = concatMap expandTargetX
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
 expandAllXs = expandTargetXs . expandSourceXs
 
-createAllArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
+createAllArcs :: Ord a => Causality a -> [FsmArcX a]
 createAllArcs = expandAllXs . createArcs
 
 -- http://stackoverflow.com/questions/5921573/convert-a-string-representing-a-binary-number-to-a-base-10-string-haskell
@@ -183,7 +185,7 @@ encToInt enc = fromMaybe 0 ((readBin . concatMap show . reverse) enc)
 fsmarcxToFsmarc :: FsmArcX a -> FsmArc a
 fsmarcxToFsmarc arc = FsmArc ((encToInt . sourceEncodingx) arc) (transx arc) ((encToInt . targetEncodingx) arc)
 
-intArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
+intArcs :: Ord a => Causality a -> [FsmArc a]
 intArcs x = map fsmarcxToFsmarc (createAllArcs x)
 
 tmpl :: String
