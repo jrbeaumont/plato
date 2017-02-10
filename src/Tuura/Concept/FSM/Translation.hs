@@ -108,35 +108,26 @@ getAllSignals :: Ord a => [[Transition a]] -> [a]
 getAllSignals = sort . foldl union [] . onlySignals
 
 addMissingSignals :: Ord a => Causality a -> [([TransitionX a], Transition a)]
-addMissingSignals x = zip (zipWith (++) (newTransitions x) ((map . map) toTransitionX oldTransitions)) (map snd x)
-    where oldTransitions = map fst x
-          newTransitions = (map . map) (flip TransitionX (Tristate Nothing)) . missingSignals . transitionList
+addMissingSignals x = zip (zipWith (++) newTransitions oldTransitions) (map snd noDupes)
+    where noDupes = removeDupes x
+          oldTransitions = map (map toTransitionX . fst) noDupes
+          newTransitions = ((map . map) (flip TransitionX (Tristate Nothing)) . missingSignals . transitionList) noDupes
           transitionList =  map fullList
-          missingSignals x = map (getAllSignals x \\) (onlySignals x)
-
-readyForEncoding :: Ord a => Causality a -> [([TransitionX a], Transition a)]
-readyForEncoding =  addMissingSignals . removeDupes
+          missingSignals y = map (getAllSignals y \\) (onlySignals y)
 
 encode :: Ord a => [TransitionX a] -> [Tristate]
 encode  = map mnewValue . sortTransitions
     where sortTransitions = sortBy (comparing msignal)
 
-makeDestEncs :: Ord a => Causality a -> [[Tristate]]
-makeDestEncs = map (encode . fullListm) . readyForEncoding
-
-makeSrcEncs :: Ord a => Causality a -> [[Tristate]]
-makeSrcEncs = map (encode . fullListm . flipTransition) . readyForEncoding
-    where flipTransition x = (fst x, (negate . snd) x)
-          negate = liftM2 Transition signal (not . newValue)
-
-activeTransitions :: Ord a => Causality a -> [Transition a]
-activeTransitions = map snd .  readyForEncoding
-
-createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
-createArc senc tenc transx = FsmArcX senc transx tenc
-
 createArcs :: Ord a => Causality a -> [FsmArcX a]
-createArcs xs = zipWith3 createArc (makeSrcEncs xs) (makeDestEncs xs) (activeTransitions xs)
+createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
+    where createArc senc tenc transx = FsmArcX senc transx tenc
+          makeDestEncs = a xs
+          makeSrcEncs = (a . map flipTransition) xs
+          a = map (encode . fullListm) . addMissingSignals
+          flipTransition x = (fst x, (negate . snd) x)
+          negate = liftM2 Transition signal (not . newValue)
+          activeTransitions = (map snd .  addMissingSignals) xs
    
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
