@@ -70,22 +70,6 @@ data FsmArc a = FsmArc
 instance Show a => Show (FsmArc a) where
     show (FsmArc senc tran tenc) = "s" ++ show senc ++ " " ++ show tran ++ " s" ++ show tenc
 
-data Signal = A | B | C | D deriving (Eq, Ord, Show, Enum)
-
-list a b c d = [([rise a, fall c, rise d], rise c),
-                ([rise b, fall c, rise d], rise c),
-                ([rise b, rise c, fall d], rise a)
-               ]
-
-andrey a b c d = [([rise a, fall c, rise d], rise c),
-                  ([rise b, fall c, rise d], rise c)
-                 ]
-
-trs a b c = [rise a, fall b, rise c]
-
-y = andrey A B C D
-b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
-
 genFSM :: (Show a, Ord a) => Causality a -> String
 genFSM causality = printf tmpl (unlines showArcs) initialMarking
     where arcs = stateArcs causality
