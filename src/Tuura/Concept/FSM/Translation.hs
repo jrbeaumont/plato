@@ -124,16 +124,12 @@ encode  = (map mnewValue) . sortTransitions
     where sortTransitions = sortBy (comparing msignal)
 
 makeDestEncs :: Ord a => Causality a -> [[Tristate]]
-makeDestEncs = (map encode) . (map fullListm) . readyForEncoding
-
-flipTransition :: Transition a -> Transition a
-flipTransition x = Transition (signal x) (not (newValue x))
-
-flipTransitions :: ([Transition a], Transition a) -> ([Transition a], Transition a)
-flipTransitions x = (fst x, flipTransition (snd x))
+makeDestEncs = map (encode . fullListm) . readyForEncoding
 
 makeSrcEncs :: Ord a => Causality a -> [[Tristate]]
-makeSrcEncs = (map encode) . (map fullListm) . readyForEncoding . (map flipTransitions)
+makeSrcEncs = map (encode . fullListm . flipTransition) . readyForEncoding
+    where flipTransition x = (fst x, (negate . snd) x)
+          negate = liftM2 Transition signal (not . newValue)
 
 activeTransitions :: Ord a => Causality a -> [Transition a]
 activeTransitions = (map (snd)) .  readyForEncoding
