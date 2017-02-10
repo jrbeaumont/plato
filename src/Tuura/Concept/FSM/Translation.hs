@@ -17,17 +17,17 @@ instance Show a => Show (Transition a) where
     show (Transition s True ) = show s ++ "+"
     show (Transition s False) = show s ++ "-"
 
-data MaybeTransition a = MaybeTransition
+data TransitionX a = TransitionX
     {
         msignal   :: a,
         mnewValue :: Tristate -- Transition x True corresponds to x+
     }
     deriving Eq
 
-instance Show a => Show (MaybeTransition a) where
-    show (MaybeTransition s (Tristate (Just True) )) = show s ++ "+"
-    show (MaybeTransition s (Tristate (Just False))) = show s ++ "-"
-    show (MaybeTransition s (Tristate Nothing     )) = show s ++ "x"
+instance Show a => Show (TransitionX a) where
+    show (TransitionX s (Tristate (Just True) )) = show s ++ "+"
+    show (TransitionX s (Tristate (Just False))) = show s ++ "-"
+    show (TransitionX s (Tristate Nothing     )) = show s ++ "x"
 
 rise :: a -> Transition a
 rise a = Transition a True
@@ -84,22 +84,22 @@ genFSM causality = printf tmpl (unlines showArcs) ("s" ++ show (sourceEncoding (
     where arcs = intArcs causality
           showArcs = map show arcs
 
-sortTransitions :: Ord a => [MaybeTransition a] -> [MaybeTransition a]
+sortTransitions :: Ord a => [TransitionX a] -> [TransitionX a]
 sortTransitions = sortBy (comparing msignal)
 
 fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
 
-fullListm :: ([MaybeTransition a], Transition a) -> [MaybeTransition a]
-fullListm (l,t) = ((liftM2 MaybeTransition signal (Tristate . Just . newValue)) t):l
+fullListm :: ([TransitionX a], Transition a) -> [TransitionX a]
+fullListm (l,t) = ((liftM2 TransitionX signal (Tristate . Just . newValue)) t):l
 
 -- Given [([a], b)], remove all b from a
 removeDupes :: Eq a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
 --(filter ((/= ((signal . snd) x)) . signal) (fst x), snd x)
 removeDupes = map (ap ((,) . ap (filter . (. signal) . (/=) . signal . snd) fst) snd)
 
-toMaybeTransition :: [[Transition a]] -> [[MaybeTransition a]]
-toMaybeTransition = (map . map) (liftM2 MaybeTransition signal (Tristate . Just . newValue))
+toMaybeTransition :: [[Transition a]] -> [[TransitionX a]]
+toMaybeTransition = (map . map) (liftM2 TransitionX signal (Tristate . Just . newValue))
 
 onlySignals :: Eq a => [[Transition a]] -> [[a]]
 onlySignals = map (map signal)
@@ -110,16 +110,16 @@ getAllSignals = (sort . foldl union ([]) . onlySignals)
 missingSignals :: Ord a => [[Transition a]] -> [[a]]
 missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
 
-addMissingSignals :: Ord a => [([Transition a], Transition a)] -> [([MaybeTransition a], Transition a)]
+addMissingSignals :: Ord a => [([Transition a], Transition a)] -> [([TransitionX a], Transition a)]
 addMissingSignals x = zip (zipWith (++) (newTransitions x) (toMaybeTransition oldTransitions)) (map snd x)
     where oldTransitions = map fst x
-          newTransitions = (((map . map) ((flip MaybeTransition) (Tristate Nothing))) . missingSignals . transitionList)
+          newTransitions = (((map . map) ((flip TransitionX) (Tristate Nothing))) . missingSignals . transitionList)
           transitionList =  (map fullList)
 
-readyForEncoding :: Ord a => [([Transition a], Transition a)] -> [([MaybeTransition a], Transition a)]
+readyForEncoding :: Ord a => [([Transition a], Transition a)] -> [([TransitionX a], Transition a)]
 readyForEncoding =  addMissingSignals . removeDupes
 
-encode :: Ord a => [MaybeTransition a] -> [Tristate]
+encode :: Ord a => [TransitionX a] -> [Tristate]
 encode  = (map mnewValue) . sortTransitions
 
 constructTargetEncodings :: Ord a => [([Transition a], Transition a)] -> [[Tristate]]
@@ -143,7 +143,8 @@ createArc senc tenc transx = FsmArcX senc transx tenc
 createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createArcs xs = zipWith3 (createArc) (constructSourceEncodings xs) (constructTargetEncodings xs) (activeTransitions xs)
    
-replaceAtIndex item ls n = a ++ (item:b) where (a, (_:b)) = splitAt n ls
+replaceAtIndex item ls n = a ++ (item:b)
+    where (a, (_:b)) = splitAt n ls
 
 expandSourceX :: FsmArcX a -> [FsmArcX a]
 expandSourceX xs = case elemIndex (Tristate Nothing) (sourceEncodingx xs) of
