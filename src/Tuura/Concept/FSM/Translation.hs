@@ -7,6 +7,7 @@ import Numeric    (readInt)
 import Text.Printf
 
 type Causality a = [([Transition a], Transition a)]
+type CausalityX a = [([TransitionX a], Transition a)]
 
 data Transition a = Transition
     {
@@ -111,7 +112,7 @@ onlySignals = map (map signal)
 getAllSignals :: Ord a => [[Transition a]] -> [a]
 getAllSignals = sort . foldl union [] . onlySignals
 
-addMissingSignals :: Ord a => Causality a -> [([TransitionX a], Transition a)]
+addMissingSignals :: Ord a => Causality a -> CausalityX a
 addMissingSignals x = zip (zipWith (++) newTransitions oldTransitions) (map snd noDupes)
     where noDupes = removeDupes x
           oldTransitions = map (map toTransitionX . fst) noDupes
