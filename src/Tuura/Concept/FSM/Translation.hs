@@ -107,14 +107,12 @@ onlySignals = map (map signal)
 getAllSignals :: Ord a => [[Transition a]] -> [a]
 getAllSignals = sort . foldl union [] . onlySignals
 
-missingSignals :: Ord a => [[Transition a]] -> [[a]]
-missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
-
 addMissingSignals :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 addMissingSignals x = zip (zipWith (++) (newTransitions x) ((map . map) toTransitionX oldTransitions)) (map snd x)
     where oldTransitions = map fst x
           newTransitions = (map . map) (flip TransitionX (Tristate Nothing)) . missingSignals . transitionList
           transitionList =  map fullList
+          missingSignals x = map (getAllSignals x \\) (onlySignals x)
 
 readyForEncoding :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 readyForEncoding =  addMissingSignals . removeDupes
