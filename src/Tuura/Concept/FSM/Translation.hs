@@ -176,7 +176,7 @@ fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
           newDestEnc = (encToInt . destEncx) arc
 
 stateArcs :: Ord a => Causality a -> [FsmArc a]
-stateArcs x = map fsmarcxToFsmarc (createAllArcs x)
+stateArcs = map fsmarcxToFsmarc . createAllArcs
 
 tmpl :: String
 tmpl = unlines [".state graph", "%s.marking{%s}", ".end"]
