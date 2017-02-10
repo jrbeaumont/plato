@@ -47,9 +47,9 @@ instance Show (Tristate) where
 
 data FsmArcX a = FsmArcX
     {
-        sourceEncodingx :: [Tristate],
+        srcEncx :: [Tristate],
         transx :: Transition a,
-        targetEncodingx :: [Tristate]
+        destEncx :: [Tristate]
     }
 
 instance Show a => Show (FsmArcX a) where
@@ -57,9 +57,9 @@ instance Show a => Show (FsmArcX a) where
 
 data FsmArc a = FsmArc
     {
-        sourceEncoding :: Int,
+        srcEnc :: Int,
         trans :: Transition a,
-        targetEncoding :: Int
+        destEnc :: Int
     }
 
 instance Show a => Show (FsmArc a) where
@@ -84,7 +84,7 @@ b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 genFSM :: (Show a, Ord a) => Causality a -> String
 genFSM causality = printf tmpl (unlines showArcs) initialMarking
     where showArcs = map show (stateArcs causality)
-          initialMarking = "s" ++ show (sourceEncoding (head arcs)) -- TODO: Implement properly!
+          initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
 
 sortTransitions :: Ord a => [TransitionX a] -> [TransitionX a]
 sortTransitions = sortBy (comparing msignal)
@@ -149,21 +149,21 @@ replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
 expandSourceX :: FsmArcX a -> [FsmArcX a]
-expandSourceX xs = case elemIndex (Tristate Nothing) (sourceEncodingx xs) of
+expandSourceX xs = case elemIndex (Tristate Nothing) (srcEncx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (sourceEncodingx xs) n),
-                           makeArc (replaceAtIndex (Tristate (Just False)) (sourceEncodingx xs) n)]
-                               where makeArc s = FsmArcX s (transx xs) (targetEncodingx xs)
+               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (srcEncx xs) n),
+                           makeArc (replaceAtIndex (Tristate (Just False)) (srcEncx xs) n)]
+                               where makeArc s = FsmArcX s (transx xs) (destEncx xs)
 
 expandSourceXs :: [FsmArcX a] -> [FsmArcX a]
 expandSourceXs = concatMap expandSourceX
 
 expandTargetX :: FsmArcX a -> [FsmArcX a]
-expandTargetX xs = case elemIndex (Tristate Nothing) (targetEncodingx xs) of
+expandTargetX xs = case elemIndex (Tristate Nothing) (destEncx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (targetEncodingx xs) n),
-                           makeArc (replaceAtIndex (Tristate (Just False)) (targetEncodingx xs) n)]
-                               where makeArc s = FsmArcX (sourceEncodingx xs) (transx xs) s
+               Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (destEncx xs) n),
+                           makeArc (replaceAtIndex (Tristate (Just False)) (destEncx xs) n)]
+                               where makeArc s = FsmArcX (srcEncx xs) (transx xs) s
 
 expandTargetXs :: [FsmArcX a] -> [FsmArcX a]
 expandTargetXs = concatMap expandTargetX
@@ -183,8 +183,8 @@ encToInt enc = fromMaybe 0 ((readBin . concatMap show . reverse) enc)
 
 fsmarcxToFsmarc :: FsmArcX a -> FsmArc a
 fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
-    where newSourceEnc = (encToInt . sourceEncodingx) arc
-          newDestEnc = (encToInt . targetEncodingx) arc
+    where newSourceEnc = (encToInt . srcEncx) arc
+          newDestEnc = (encToInt . destEncx) arc
 
 stateArcs :: Ord a => Causality a -> [FsmArc a]
 stateArcs x = map fsmarcxToFsmarc (createAllArcs x)
