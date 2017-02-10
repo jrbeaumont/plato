@@ -132,6 +132,7 @@ createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
+-- Expand source states so no X's remain
 expandSrcX :: FsmArcX a -> [FsmArcX a]
 expandSrcX xs = case elemIndex triX (srcEncx xs) of
                Nothing -> [xs]
@@ -139,10 +140,7 @@ expandSrcX xs = case elemIndex triX (srcEncx xs) of
                            makeArc (replaceAtIndex triFalse (srcEncx xs) n)]
                                where makeArc s = FsmArcX s (transx xs) (destEncx xs)
 
--- Expand source states so no X's remain
-expandSrcXs :: [FsmArcX a] -> [FsmArcX a]
-expandSrcXs = concatMap expandSrcX
-
+-- Expand destination states so no X's remain
 expandDestX :: FsmArcX a -> [FsmArcX a]
 expandDestX xs = case elemIndex triX (destEncx xs) of
                Nothing -> [xs]
@@ -150,12 +148,8 @@ expandDestX xs = case elemIndex triX (destEncx xs) of
                            makeArc (replaceAtIndex triFalse (destEncx xs) n)]
                                where makeArc = FsmArcX (srcEncx xs) (transx xs)
 
--- Expand destination states so no X's remain
-expandDestXs :: [FsmArcX a] -> [FsmArcX a]
-expandDestXs = concatMap expandDestX
-
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
-expandAllXs = expandDestXs . expandSrcXs
+expandAllXs = concatMap expandDestX . concatMap expandSrcX
 
 -- http://stackoverflow.com/questions/5921573/convert-a-string-representing-a-binary-number-to-a-base-10-string-haskell
 readBin :: Integral a => String -> Maybe a
