@@ -83,7 +83,8 @@ b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 
 genFSM :: (Show a, Ord a) => Causality a -> String
 genFSM causality = printf tmpl (unlines showArcs) initialMarking
-    where showArcs = map show (stateArcs causality)
+    where arcs = stateArcs causality
+          showArcs = map show arcs
           initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
 
 fullList :: ([a], a) -> [a]
