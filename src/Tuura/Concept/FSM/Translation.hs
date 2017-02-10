@@ -83,9 +83,8 @@ b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 
 genFSM :: (Show a, Ord a) => Causality a -> String
 genFSM causality = printf tmpl (unlines showArcs) initialMarking
-    where arcs = intArcs causality
-          showArcs = map show arcs
-          initialMarking = "s" ++ show (sourceEncoding (head arcs))
+    where showArcs = map show (stateArcs causality)
+          initialMarking = "s" ++ show (sourceEncoding (head arcs)) -- TODO: Implement properly!
 
 sortTransitions :: Ord a => [TransitionX a] -> [TransitionX a]
 sortTransitions = sortBy (comparing msignal)
@@ -187,8 +186,8 @@ fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
     where newSourceEnc = (encToInt . sourceEncodingx) arc
           newDestEnc = (encToInt . targetEncodingx) arc
 
-intArcs :: Ord a => Causality a -> [FsmArc a]
-intArcs x = map fsmarcxToFsmarc (createAllArcs x)
+stateArcs :: Ord a => Causality a -> [FsmArc a]
+stateArcs x = map fsmarcxToFsmarc (createAllArcs x)
 
 tmpl :: String
 tmpl = unlines [".state graph", "%s.marking{%s}", ".end"]
