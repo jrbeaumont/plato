@@ -80,9 +80,10 @@ y = andrey A B C D
 b = [Tristate (Just True), Tristate (Just True), Tristate (Just False)]
 
 genFSM :: (Show a, Ord a) => [([Transition a], Transition a)] -> String
-genFSM causality = printf tmpl (unlines showArcs) ("s" ++ show (sourceEncoding (head arcs)))
+genFSM causality = printf tmpl (unlines showArcs) initialMarking
     where arcs = intArcs causality
           showArcs = map show arcs
+          initialMarking = "s" ++ show (sourceEncoding (head arcs))
 
 sortTransitions :: Ord a => [TransitionX a] -> [TransitionX a]
 sortTransitions = sortBy (comparing msignal)
