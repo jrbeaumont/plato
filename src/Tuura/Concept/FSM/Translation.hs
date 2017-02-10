@@ -40,7 +40,7 @@ fall a = Transition a False
 data Tristate = Tristate (Maybe Bool)
     deriving Eq
 
-instance Show (Tristate) where
+instance Show Tristate where
     show (Tristate (Just True) ) = "1"
     show (Tristate (Just False)) = "0"
     show (Tristate Nothing     ) = "x"
@@ -99,13 +99,13 @@ removeDupes :: Eq a => Causality a -> Causality a
 removeDupes = map (ap ((,) . ap (filter . (. signal) . (/=) . signal . snd) fst) snd)
 
 toTransitionX :: Transition a -> TransitionX a
-toTransitionX = (liftM2 TransitionX signal (Tristate . Just . newValue))
+toTransitionX = liftM2 TransitionX signal (Tristate . Just . newValue)
 
 onlySignals :: Eq a => [[Transition a]] -> [[a]]
 onlySignals = map (map signal)
 
 getAllSignals :: Ord a => [[Transition a]] -> [a]
-getAllSignals = (sort . foldl union ([]) . onlySignals)
+getAllSignals = sort . foldl union [] . onlySignals
 
 missingSignals :: Ord a => [[Transition a]] -> [[a]]
 missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
@@ -113,14 +113,14 @@ missingSignals x = map ((\\) (getAllSignals x)) (onlySignals x)
 addMissingSignals :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 addMissingSignals x = zip (zipWith (++) (newTransitions x) ((map . map) toTransitionX oldTransitions)) (map snd x)
     where oldTransitions = map fst x
-          newTransitions = (((map . map) ((flip TransitionX) (Tristate Nothing))) . missingSignals . transitionList)
-          transitionList =  (map fullList)
+          newTransitions = (map . map) (flip TransitionX (Tristate Nothing)) . missingSignals . transitionList
+          transitionList =  map fullList
 
 readyForEncoding :: Ord a => Causality a -> [([TransitionX a], Transition a)]
 readyForEncoding =  addMissingSignals . removeDupes
 
 encode :: Ord a => [TransitionX a] -> [Tristate]
-encode  = (map mnewValue) . sortTransitions
+encode  = map mnewValue . sortTransitions
     where sortTransitions = sortBy (comparing msignal)
 
 makeDestEncs :: Ord a => Causality a -> [[Tristate]]
@@ -132,13 +132,13 @@ makeSrcEncs = map (encode . fullListm . flipTransition) . readyForEncoding
           negate = liftM2 Transition signal (not . newValue)
 
 activeTransitions :: Ord a => Causality a -> [Transition a]
-activeTransitions = (map (snd)) .  readyForEncoding
+activeTransitions = map snd .  readyForEncoding
 
 createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
 createArc senc tenc transx = FsmArcX senc transx tenc
 
 createArcs :: Ord a => Causality a -> [FsmArcX a]
-createArcs xs = zipWith3 (createArc) (makeSrcEncs xs) (makeDestEncs xs) (activeTransitions xs)
+createArcs xs = zipWith3 createArc (makeSrcEncs xs) (makeDestEncs xs) (activeTransitions xs)
    
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
@@ -158,7 +158,7 @@ expandTargetX xs = case elemIndex (Tristate Nothing) (destEncx xs) of
                Nothing -> [xs]
                Just n  -> [makeArc (replaceAtIndex (Tristate (Just True)) (destEncx xs) n),
                            makeArc (replaceAtIndex (Tristate (Just False)) (destEncx xs) n)]
-                               where makeArc s = FsmArcX (srcEncx xs) (transx xs) s
+                               where makeArc = FsmArcX (srcEncx xs) (transx xs)
 
 expandTargetXs :: [FsmArcX a] -> [FsmArcX a]
 expandTargetXs = concatMap expandTargetX
