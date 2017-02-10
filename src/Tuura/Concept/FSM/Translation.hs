@@ -122,8 +122,8 @@ encode :: Ord a => [TransitionX a] -> [Tristate]
 encode  = (map mnewValue) . sortTransitions
     where sortTransitions = sortBy (comparing msignal)
 
-constructTargetEncodings :: Ord a => Causality a -> [[Tristate]]
-constructTargetEncodings = (map encode) . (map fullListm) . readyForEncoding
+makeDestEncs :: Ord a => Causality a -> [[Tristate]]
+makeDestEncs = (map encode) . (map fullListm) . readyForEncoding
 
 flipTransition :: Transition a -> Transition a
 flipTransition x = Transition (signal x) (not (newValue x))
@@ -131,8 +131,8 @@ flipTransition x = Transition (signal x) (not (newValue x))
 flipTransitions :: ([Transition a], Transition a) -> ([Transition a], Transition a)
 flipTransitions x = (fst x, flipTransition (snd x))
 
-constructSourceEncodings :: Ord a => Causality a -> [[Tristate]]
-constructSourceEncodings = (map encode) . (map fullListm) . readyForEncoding . (map flipTransitions)
+makeSrcEncs :: Ord a => Causality a -> [[Tristate]]
+makeSrcEncs = (map encode) . (map fullListm) . readyForEncoding . (map flipTransitions)
 
 activeTransitions :: Ord a => Causality a -> [Transition a]
 activeTransitions = (map (snd)) .  readyForEncoding
@@ -141,7 +141,7 @@ createArc :: [Tristate] -> [Tristate] -> Transition a -> FsmArcX a
 createArc senc tenc transx = FsmArcX senc transx tenc
 
 createArcs :: Ord a => Causality a -> [FsmArcX a]
-createArcs xs = zipWith3 (createArc) (constructSourceEncodings xs) (constructTargetEncodings xs) (activeTransitions xs)
+createArcs xs = zipWith3 (createArc) (makeSrcEncs xs) (makeDestEncs xs) (activeTransitions xs)
    
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
