@@ -183,7 +183,9 @@ encToInt :: [Tristate] -> Int
 encToInt enc = fromMaybe 0 ((readBin . concatMap show . reverse) enc)
 
 fsmarcxToFsmarc :: FsmArcX a -> FsmArc a
-fsmarcxToFsmarc arc = FsmArc ((encToInt . sourceEncodingx) arc) (transx arc) ((encToInt . targetEncodingx) arc)
+fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
+    where newSourceEnc = (encToInt . sourceEncodingx) arc
+          newDestEnc = (encToInt . targetEncodingx) arc
 
 intArcs :: Ord a => Causality a -> [FsmArc a]
 intArcs x = map fsmarcxToFsmarc (createAllArcs x)
