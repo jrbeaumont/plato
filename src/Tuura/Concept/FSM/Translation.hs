@@ -86,9 +86,6 @@ genFSM causality = printf tmpl (unlines showArcs) initialMarking
     where showArcs = map show (stateArcs causality)
           initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
 
-sortTransitions :: Ord a => [TransitionX a] -> [TransitionX a]
-sortTransitions = sortBy (comparing msignal)
-
 fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
 
@@ -123,6 +120,7 @@ readyForEncoding =  addMissingSignals . removeDupes
 
 encode :: Ord a => [TransitionX a] -> [Tristate]
 encode  = (map mnewValue) . sortTransitions
+    where sortTransitions = sortBy (comparing msignal)
 
 constructTargetEncodings :: Ord a => Causality a -> [[Tristate]]
 constructTargetEncodings = (map encode) . (map fullListm) . readyForEncoding
