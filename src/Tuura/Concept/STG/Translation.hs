@@ -21,8 +21,8 @@ import Tuura.Concept.STG
 
 -- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
-translate :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
-translate signs circuit = do
+translateSTG :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
+translateSTG signs circuit = do
     case validate signs circuit of
         Valid -> do
             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
@@ -105,3 +105,14 @@ consistencyLoop s = map (\f -> printf f s s) ["%s0 %s+", "%s+ %s1", "%s1 %s-", "
 
 readArc :: String -> String -> [String]
 readArc f t = [f ++ " " ++ t, t ++ " " ++ f]
+
+-- translate :: Bool -> [Signal] -> CircuitConcept Signal -> IO ()
+-- translate transFSM signs circuit = do
+--     if transFSM then do
+--         let translation = liftIO $ putStr $ translateFSM signs circuit
+--         (_, _) <- liftIO $ runSimulationFSM translation (FSM.State $ const False)
+--         return ()
+--     else do
+--         let translation = liftIO $ putStr $ translateSTG signs circuit
+--         (_, _) <- liftIO $ runSimulationSTG translation (STG.State $ const False)
+--         return ()

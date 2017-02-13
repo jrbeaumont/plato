@@ -65,8 +65,8 @@ instance Show a => Show (FsmArc a) where
 
 -- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
-translate :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
-translate signs circuit = do
+translateFSM :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
+translateFSM signs circuit = do
     case validate signs circuit of
         Valid -> do
             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
