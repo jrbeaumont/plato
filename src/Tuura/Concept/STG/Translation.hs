@@ -1,21 +1,25 @@
 module Tuura.Concept.STG.Translation where
 
-import Data.Char
+-- import Data.Char
 import Data.List.Extra
 import Text.Printf
 
+import Tuura.Plato.Translation
+
 import Tuura.Concept.STG
 
-data Signal = Signal Int deriving Eq
+-- data Signal = Signal Int deriving Eq
 
-instance Show Signal where
-    show (Signal i)
-        | i < 26    = [chr (ord 'A' + i)]
-        | otherwise = 'S' : show i
+-- instance Show Signal where
+--     show (Signal i)
+--         | i < 26    = [chr (ord 'A' + i)]
+--         | otherwise = 'S' : show i
 
-instance Ord Signal
-    where
-        compare (Signal x) (Signal y) = compare x y
+-- instance Ord Signal
+--     where
+--         compare (Signal x) (Signal y) = compare x y
+
+-- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
 translate :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
 translate signs circuit = do
@@ -29,14 +33,14 @@ translate signs circuit = do
             genSTG inputSigns outputSigns internalSigns arcStrs initStrs
         Invalid unused incons undef -> "Error. \n" ++ addErrors unused incons undef
 
-addErrors :: (Eq a, Show a) => [a] -> [a] -> [a] -> String
-addErrors unused incons undef = un ++ ic ++ ud
-  where
-    un = if (unused /= []) then ("The following signals are not declared as input, output or internal: \n" ++ unlines (map show unused) ++ "\n") else ""
-    ic = if (unused /= []) then ("The following signals have inconsistent inital states: \n" ++ unlines (map show incons) ++ "\n") else ""
-    ud = if (undef  /= []) then ("The following signals have undefined initial states: \n" ++ unlines (map show undef) ++ "\n") else ""
+-- addErrors :: (Eq a, Show a) => [a] -> [a] -> [a] -> String
+-- addErrors unused incons undef = un ++ ic ++ ud
+--   where
+--     un = if (unused /= []) then ("The following signals are not declared as input, output or internal: \n" ++ unlines (map show unused) ++ "\n") else ""
+--     ic = if (unused /= []) then ("The following signals have inconsistent inital states: \n" ++ unlines (map show incons) ++ "\n") else ""
+--     ud = if (undef  /= []) then ("The following signals have undefined initial states: \n" ++ unlines (map show undef) ++ "\n") else ""
 
-data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
+-- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
 validate :: Eq a => [a] -> CircuitConcept a -> ValidationResult a
 validate signs circuit
@@ -87,17 +91,17 @@ transition (f, t)
 tmpl :: String
 tmpl = unlines [".model out", ".inputs %s", ".outputs %s", ".internal %s", ".graph", "%s.marking {%s}", ".end"]
 
-output :: [(String, Bool)] -> [String]
-output = nubOrd . map fst
+-- output :: [(String, Bool)] -> [String]
+-- output = nubOrd . map fst
 
 consistencyLoop :: String -> [String]
 consistencyLoop s = map (\f -> printf f s s) ["%s0 %s+", "%s+ %s1", "%s1 %s-", "%s- %s0"]
 
-initVals :: [String] -> [(String, Bool)] -> [String]
-initVals l symbInits = concat (map (\s -> [printf "%s%i" s $ initVal s symbInits]) l)
+-- initVals :: [String] -> [(String, Bool)] -> [String]
+-- initVals l symbInits = concat (map (\s -> [printf "%s%i" s $ initVal s symbInits]) l)
 
-initVal :: String -> [(String, Bool)] -> Int
-initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
+-- initVal :: String -> [(String, Bool)] -> Int
+-- initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
 
 readArc :: String -> String -> [String]
 readArc f t = [f ++ " " ++ t, t ++ " " ++ f]

@@ -1,3 +1,5 @@
+module Tuura.Concept.FSM.Translation where
+
 import Data.List
 import Data.Ord (comparing)
 import Control.Monad
@@ -6,27 +8,13 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import Numeric    (readInt)
 import Text.Printf
 
+import Tuura.Concept.FSM
+
+import Tuura.Plato.Translation
+
 -- Type aliases
-type Causality a = [([Transition a], Transition a)]
+-- type Causality a = [([Transition a], Transition a)]
 type CausalityX a = [([TransitionX a], Transition a)]
-
--- Normal transition type
-data Transition a = Transition
-    {
-        signal   :: a,
-        newValue :: Bool -- Transition x True corresponds to x+
-    }
-    deriving Eq
-
-instance Show a => Show (Transition a) where
-    show (Transition s True ) = show s ++ "+"
-    show (Transition s False) = show s ++ "-"
-
-rise :: a -> Transition a
-rise a = Transition a True
-
-fall :: a -> Transition a
-fall a = Transition a False
 
 -- Transition type using Tristate. Used for initial construction of arcs.
 data TransitionX a = TransitionX
@@ -75,15 +63,49 @@ data FsmArc a = FsmArc
 instance Show a => Show (FsmArc a) where
     show (FsmArc senc tran tenc) = "s" ++ show senc ++ " " ++ show tran ++ " s" ++ show tenc
 
+-- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
+
+translate :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
+translate signs circuit = do
+    case validate signs circuit of
+        Valid -> do
+            let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
+            let arcStrs = map show (createAllArcs (arcs circuit))-- concatMap handleArcs (groupSortOn snd (arcs circuit))
+            let inputSigns = filter ((==Input) . interface circuit) signs
+            let outputSigns = filter ((==Output) . interface circuit) signs
+            let internalSigns = filter ((==Internal) . interface circuit) signs
+            genFSM inputSigns outputSigns internalSigns arcStrs initStrs
+        Invalid unused incons undef -> "Error. \n" ++ addErrors unused incons undef
+
+validate :: Eq a => [a] -> CircuitConcept a -> ValidationResult a
+validate signs circuit
+    | unused ++ inconsistent ++ undef == [] = Valid
+    | otherwise                             = Invalid unused inconsistent undef
+  where
+    unused       = filter ((==Unused) . interface circuit) signs
+    inconsistent = filter ((==Inconsistent) . initial circuit) signs
+    undef        = filter ((==Undefined) . initial circuit) signs
+
 -- Create .sg file string
-genFSM :: (Show a, Ord a) => Causality a -> String
-genFSM causality = printf tmpl (unlines showArcs) initialMarking
-    where arcs = createAllArcs causality
-          showArcs = map show arcs
-          initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
+-- genFSM :: (Show a, Ord a) => Causality a -> String
+-- genFSM causality = printf tmpl (unlines showArcs) initialMarking
+--     where arcs = createAllArcs causality
+--           showArcs = map show arcs
+--           initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
+
+genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> [(String, Bool)] -> String
+genFSM inputSigns outputSigns internalSigns arcStrs initStrs =
+     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs) (unwords marks)
+    where
+        allSigns = output initStrs
+        outs = map show outputSigns
+        ins = map show inputSigns
+        ints = map show internalSigns
+        --allArcs = concatMap consistencyLoop allSigns ++ arcStrs
+        marks = initVals allSigns initStrs
 
 tmpl :: String
-tmpl = unlines [".state graph", "%s.marking{%s}", ".end"]
+tmpl = unlines [".inputs %s", ".outputs %s", ".internals %s", ".state graph", "%s.marking{%s}", ".end"]
 
 fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
@@ -92,8 +114,8 @@ fullListm :: ([TransitionX a], Transition a) -> [TransitionX a]
 fullListm (l,t) = (toTransitionX t):l
 
 -- Given [([a], b)], remove all b from a
-removeDupes :: Eq a => Causality a -> Causality a
---(filter ((/= ((signal . snd) x)) . signal) (fst x), snd x)
+removeDupes :: Eq a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
+-- (filter ((/= ((signal . snd) x)) . signal) (fst x), snd x)
 removeDupes = map (ap ((,) . ap (filter . (. signal) . (/=) . signal . snd) fst) snd)
 
 toTransitionX :: Transition a -> TransitionX a
@@ -107,7 +129,7 @@ onlySignals = map (map signal)
 getAllSignals :: Ord a => [[Transition a]] -> [a]
 getAllSignals = sort . foldl union [] . onlySignals
 
-addMissingSignals :: Ord a => Causality a -> CausalityX a
+addMissingSignals :: Ord a => [([Transition a], Transition a)] -> CausalityX a
 addMissingSignals x = zip (zipWith (++) newTransitions oldTransitions) (map snd noDupes)
     where noDupes = removeDupes x
           oldTransitions = map (map toTransitionX . fst) noDupes
@@ -119,7 +141,7 @@ encode :: Ord a => [TransitionX a] -> [Tristate]
 encode  = map mnewValue . sortTransitions
     where sortTransitions = sortBy (comparing msignal)
 
-createArcs :: Ord a => Causality a -> [FsmArcX a]
+createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
     where createArc senc tenc transx = FsmArcX senc transx tenc
           makeDestEncs = a xs
@@ -128,7 +150,7 @@ createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
           flipTransition x = (fst x, (negate . snd) x)
           negate = liftM2 Transition signal (not . newValue)
           activeTransitions = (map snd .  addMissingSignals) xs
-   
+
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
@@ -164,5 +186,5 @@ fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
           newDestEnc = (encToInt . destEncx) arc
 
 -- Produce all arcs with all X's resolved
-createAllArcs :: Ord a => Causality a -> [FsmArc a]
+createAllArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArc a]
 createAllArcs = map fsmarcxToFsmarc . expandAllXs . createArcs
