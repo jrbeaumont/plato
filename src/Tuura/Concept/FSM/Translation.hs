@@ -174,15 +174,27 @@ createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
--- Expand source state so no X's remain
 expandX :: FsmArcX a -> [FsmArcX a]
 expandX xs = case elemIndex triX (srcEncx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex triTrue (srcEncx xs) n)
-                                   (replaceAtIndex triTrue (destEncx xs) n),
-                           makeArc (replaceAtIndex triFalse (srcEncx xs) n)
-                                   (replaceAtIndex triFalse (destEncx xs) n)]
-                               where makeArc s d = FsmArcX s (transx xs) d
+               Just n  -> do
+                let newTrue = makeArc (replaceAtIndex triTrue (srcEncx xs) n)
+                                       (replaceAtIndex triTrue (destEncx xs) n)
+                let newFalse = makeArc (replaceAtIndex triFalse (srcEncx xs) n)
+                                  (replaceAtIndex triFalse (destEncx xs) n)
+                let result = [newTrue, newFalse]
+                expandX newTrue ++ expandX newFalse
+                  where makeArc s d = FsmArcX s (transx xs) d
+
+-- -- Expand source state so no X's remain
+-- expandX :: FsmArcX a -> [FsmArcX a]
+-- expandX xs = case elemIndex triX (srcEncx xs) of
+--                Nothing -> [xs]
+--                Just n  -> [makeArc (replaceAtIndex triTrue (srcEncx xs) n)
+--                                    (replaceAtIndex triTrue (destEncx xs) n),
+--                            makeArc (replaceAtIndex triFalse (srcEncx xs) n)
+--                                    (replaceAtIndex triFalse (destEncx xs) n)]
+--                                where makeArc s d = FsmArcX s (transx xs) d
 
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
 expandAllXs = concatMap expandX

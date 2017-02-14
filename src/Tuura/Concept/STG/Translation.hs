@@ -37,8 +37,10 @@ translateSTG circuitName ctype signs = do
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
             GHC.liftIO $ putStr (genSTG inputSigns outputSigns internalSigns arcStrs initStrs)
-        Invalid unused incons undef ->
+            return ()
+        Invalid unused incons undef -> do
             GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
+            return ()
 
 handleArcs :: Show a => [([Transition a], Transition a)] -> [String]
 handleArcs arcLists = addConsistencyTrans effect n ++ concatMap transition arcMap
