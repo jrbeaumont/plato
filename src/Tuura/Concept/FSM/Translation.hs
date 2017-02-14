@@ -133,23 +133,17 @@ replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
 -- Expand source state so no X's remain
-expandSrcX :: FsmArcX a -> [FsmArcX a]
-expandSrcX xs = case elemIndex triX (srcEncx xs) of
+expandX :: FsmArcX a -> [FsmArcX a]
+expandX xs = case elemIndex triX (srcEncx xs) of
                Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex triTrue (srcEncx xs) n),
-                           makeArc (replaceAtIndex triFalse (srcEncx xs) n)]
-                               where makeArc s = FsmArcX s (transx xs) (destEncx xs)
-
--- Expand destination state so no X's remain
-expandDestX :: FsmArcX a -> [FsmArcX a]
-expandDestX xs = case elemIndex triX (destEncx xs) of
-               Nothing -> [xs]
-               Just n  -> [makeArc (replaceAtIndex triTrue (destEncx xs) n),
-                           makeArc (replaceAtIndex triFalse (destEncx xs) n)]
-                               where makeArc = FsmArcX (srcEncx xs) (transx xs)
+               Just n  -> [makeArc (replaceAtIndex triTrue (srcEncx xs) n)
+                                   (replaceAtIndex triTrue (destEncx xs) n),
+                           makeArc (replaceAtIndex triFalse (srcEncx xs) n)
+                                   (replaceAtIndex triFalse (destEncx xs) n)]
+                               where makeArc s d = FsmArcX s (transx xs) d
 
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
-expandAllXs = concatMap expandDestX . concatMap expandSrcX
+expandAllXs = concatMap expandX
 
 -- http://stackoverflow.com/questions/5921573/convert-a-string-representing-a-binary-number-to-a-base-10-string-haskell
 readBin :: Integral a => String -> Maybe a
