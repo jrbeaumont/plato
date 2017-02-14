@@ -8,6 +8,9 @@ import Tuura.Plato.Translation
 
 import Tuura.Concept.STG
 
+import qualified Language.Haskell.Interpreter as GHC
+import qualified Language.Haskell.Interpreter.Unsafe as GHC
+
 -- data Signal = Signal Int deriving Eq
 
 -- instance Show Signal where
@@ -21,8 +24,11 @@ import Tuura.Concept.STG
 
 -- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
-translateSTG :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
-translateSTG signs circuit = do
+translateSTG :: (Show a, Ord a) => String -> String -> [a] -> GHC.Interpreter ()
+translateSTG circuitName ctype signs = do
+    circ <- GHC.unsafeInterpret circuitName ctype
+    apply <- GHC.unsafeInterpret "apply" $ "(" ++ ctype ++ ") -> CircuitConcept Signal"
+    let circuit = apply circ
     case validate signs circuit of
         Valid -> do
             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
@@ -30,8 +36,30 @@ translateSTG signs circuit = do
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
-            genSTG inputSigns outputSigns internalSigns arcStrs initStrs
-        Invalid unused incons undef -> "Error. \n" ++ addErrors unused incons undef
+            GHC.liftIO $ putStr (genSTG inputSigns outputSigns internalSigns arcStrs initStrs)
+        Invalid unused incons undef ->
+            GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
+
+handleArcs :: Show a => [([Transition a], Transition a)] -> [String]
+handleArcs arcLists = addConsistencyTrans effect n ++ concatMap transition arcMap
+        where
+            effect = snd (head arcLists)
+            effectCauses = map fst arcLists
+            transCauses = cartesianProduct effectCauses
+            n = length transCauses
+            arcMap = concat (map (\m -> arcPairs m effect) (zip transCauses [0..(n-1)]))
+
+-- translateSTG :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
+-- translateSTG signs circuit = do
+--     case validate signs circuit of
+--         Valid -> do
+--             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
+--             let arcStrs = concatMap handleArcs (groupSortOn snd (arcs circuit))
+--             let inputSigns = filter ((==Input) . interface circuit) signs
+--             let outputSigns = filter ((==Output) . interface circuit) signs
+--             let internalSigns = filter ((==Internal) . interface circuit) signs
+--             genSTG inputSigns outputSigns internalSigns arcStrs initStrs
+--         Invalid unused incons undef -> "Error. \n" ++ addErrors unused incons undef
 
 -- addErrors :: (Eq a, Show a) => [a] -> [a] -> [a] -> String
 -- addErrors unused incons undef = un ++ ic ++ ud
@@ -51,14 +79,7 @@ validate signs circuit
     inconsistent = filter ((==Inconsistent) . initial circuit) signs
     undef        = filter ((==Undefined) . initial circuit) signs
 
-handleArcs :: Show a => [([Transition a], Transition a)] -> [String]
-handleArcs arcLists = addConsistencyTrans effect n ++ concatMap transition arcMap
-        where
-            effect = snd (head arcLists)
-            effectCauses = map fst arcLists
-            transCauses = sequence effectCauses
-            n = length transCauses
-            arcMap = concat (map (\m -> arcPairs m effect) (zip transCauses [0..(n-1)]))
+
 
 genSTG :: Show a => [a] -> [a] -> [a] -> [String] -> [(String, Bool)] -> String
 genSTG inputSigns outputSigns internalSigns arcStrs initStrs =
@@ -91,17 +112,17 @@ transition (f, t)
 tmpl :: String
 tmpl = unlines [".model out", ".inputs %s", ".outputs %s", ".internal %s", ".graph", "%s.marking {%s}", ".end"]
 
--- output :: [(String, Bool)] -> [String]
--- output = nubOrd . map fst
+output :: [(String, Bool)] -> [String]
+output = nubOrd . map fst
 
 consistencyLoop :: String -> [String]
 consistencyLoop s = map (\f -> printf f s s) ["%s0 %s+", "%s+ %s1", "%s1 %s-", "%s- %s0"]
 
--- initVals :: [String] -> [(String, Bool)] -> [String]
--- initVals l symbInits = concat (map (\s -> [printf "%s%i" s $ initVal s symbInits]) l)
+initVals :: [String] -> [(String, Bool)] -> [String]
+initVals l symbInits = concat (map (\s -> [printf "%s%i" s $ initVal s symbInits]) l)
 
--- initVal :: String -> [(String, Bool)] -> Int
--- initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
+initVal :: String -> [(String, Bool)] -> Int
+initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
 
 readArc :: String -> String -> [String]
 readArc f t = [f ++ " " ++ t, t ++ " " ++ f]

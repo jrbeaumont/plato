@@ -99,19 +99,23 @@ doWork transFSM paths = do
     {- Fetch our signals. -}
     signs <- GHC.interpret "signs" (GHC.as :: [Signal])
     {- Obtain the circuit in terms of any signal (takes them as args). -}
-    let ctype = strRepeat numSigns "Signal ->" ++ "STG.CircuitConcept Signal"
-    circuit <- GHC.unsafeInterpret circuitName ctype
-    {- Use our generated code to apply our signals to the circuit above -}
-    apply <- GHC.unsafeInterpret "apply" $ "(" ++ ctype ++ ") -> STG.CircuitConcept Signal"
-    let fullCircuit = apply circuit
+    let ctype = strRepeat numSigns "Signal ->" ++ "CircuitConcept Signal"
+    -- circuit <- GHC.unsafeInterpret circuitName ctype
     if transFSM then do
-        let translation = GHC.liftIO $ putStr $ FSM.translateFSM signs circuit
-        (_, _) <- GHC.liftIO $ FSM.runSimulationFSM translation (FSM.State $ const False)
-        return ()
-    else do
-        let translation = GHC.liftIO $ putStr $ STG.translateSTG signs circuit
-        (_, _) <- GHC.liftIO $ STG.runSimulationSTG translation (STG.State $ const False)
-        return ()
+        FSM.translateFSM circuitName ctype signs
+    else
+        STG.translateSTG circuitName ctype signs
+    {- Use our generated code to apply our signals to the circuit above -}
+    -- apply <- GHC.unsafeInterpret "apply" $ "(" ++ ctype ++ ") -> STG.CircuitConcept Signal"
+    -- let fullCircuit = apply circuit
+    -- if transFSM then do
+    --     let translation = GHC.liftIO $ putStr $ FSM.translateFSM signs circuit
+    --     (_, _) <- GHC.liftIO $ FSM.runSimulationFSM translation (FSM.State $ const False)
+    --     return ()
+    -- else do
+    --     let translation = GHC.liftIO $ putStr $ STG.translateSTG signs circuit
+    --     (_, _) <- GHC.liftIO $ STG.runSimulationSTG translation (STG.State $ const False)
+    --     return ()
     -- liftIO $ translate transFSM signs fullCircuit
     -- let translation = liftIO $ putStr $ translate signs fullCircuit
     -- (_, _) <- liftIO $ runSimulation translation (State $ const False)

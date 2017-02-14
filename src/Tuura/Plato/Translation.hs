@@ -2,10 +2,6 @@ module Tuura.Plato.Translation where
 
 import Data.Char
 import Data.List.Extra
-import Text.Printf
-
---import Tuura.Concept.FSM
---import Tuura.Concept.STG
 
 data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
@@ -36,11 +32,14 @@ addErrors unused incons undef = un ++ ic ++ ud
     ic = if (unused /= []) then ("The following signals have inconsistent inital states: \n" ++ unlines (map show incons) ++ "\n") else ""
     ud = if (undef  /= []) then ("The following signals have undefined initial states: \n" ++ unlines (map show undef) ++ "\n") else ""
 
-initVals :: [String] -> [(String, Bool)] -> [String]
-initVals l symbInits = concat (map (\s -> [printf "%s%i" s $ initVal s symbInits]) l)
+cartesianProduct :: [[a]] -> [[a]]
+cartesianProduct l = sequence l
 
-initVal :: String -> [(String, Bool)] -> Int
-initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
+-- initVals :: [String] -> [(String, Bool)] -> [String]
+-- initVals l symbInits = concat (map (\s -> [printf "%s%i" s $ initVal s symbInits]) l)
 
-output :: [(String, Bool)] -> [String]
-output = nubOrd . map fst
+-- initVal :: String -> [(String, Bool)] -> Int
+-- initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
+
+-- output :: [(String, Bool)] -> [String]
+-- output = nubOrd . map fst

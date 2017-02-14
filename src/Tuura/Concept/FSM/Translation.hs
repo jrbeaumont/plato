@@ -1,6 +1,7 @@
 module Tuura.Concept.FSM.Translation where
 
 import Data.List
+import Data.List.Extra
 import Data.Ord (comparing)
 import Control.Monad
 import Data.Char  (digitToInt)
@@ -11,6 +12,9 @@ import Text.Printf
 import Tuura.Concept.FSM
 
 import Tuura.Plato.Translation
+
+import qualified Language.Haskell.Interpreter as GHC
+import qualified Language.Haskell.Interpreter.Unsafe as GHC
 
 -- Type aliases
 -- type Causality a = [([Transition a], Transition a)]
@@ -65,17 +69,23 @@ instance Show a => Show (FsmArc a) where
 
 -- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
-translateFSM :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
-translateFSM signs circuit = do
+translateFSM :: (Show a, Ord a) => String -> String -> [a] -> GHC.Interpreter ()
+translateFSM circuitName ctype signs = do
+    circ <- GHC.unsafeInterpret circuitName ctype
+    apply <- GHC.unsafeInterpret "apply" $ "(" ++ ctype ++ ") -> CircuitConcept Signal"
+    let circuit = apply circ
     case validate signs circuit of
         Valid -> do
-            let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
-            let arcStrs = map show (createAllArcs (arcs circuit))-- concatMap handleArcs (groupSortOn snd (arcs circuit))
+            --let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
+            let allSigns = map show signs
+            let sortedArcs = concatMap handleArcs (groupSortOn snd (arcs circuit))
+            let arcStrs = map show (createAllArcs sortedArcs)-- concatMap handleArcs (groupSortOn snd (arcs circuit))
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
-            genFSM inputSigns outputSigns internalSigns arcStrs initStrs
-        Invalid unused incons undef -> "Error. \n" ++ addErrors unused incons undef
+            GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs allSigns) -- initStrs)
+        Invalid unused incons undef ->
+            GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
 
 validate :: Eq a => [a] -> CircuitConcept a -> ValidationResult a
 validate signs circuit
@@ -86,26 +96,36 @@ validate signs circuit
     inconsistent = filter ((==Inconsistent) . initial circuit) signs
     undef        = filter ((==Undefined) . initial circuit) signs
 
+handleArcs :: Show a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
+handleArcs arcLists = result
+        where
+            effect = snd (head arcLists)
+            effectCauses = map fst arcLists
+            transCauses = cartesianProduct effectCauses
+            result = map (\m -> (m, effect)) transCauses
+            -- n = length transCauses
+            -- arcMap = concat (map (\m -> arcPairs m effect) (zip transCauses [0..(n-1)]))
+
 -- Create .sg file string
--- genFSM :: (Show a, Ord a) => Causality a -> String
+-- genFSM :: (Show a, Ord a) => [([Transition a], Transition a)] -> String
 -- genFSM causality = printf tmpl (unlines showArcs) initialMarking
 --     where arcs = createAllArcs causality
 --           showArcs = map show arcs
 --           initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
 
-genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> [(String, Bool)] -> String
-genFSM inputSigns outputSigns internalSigns arcStrs initStrs =
-     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs) (unwords marks)
+genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> [String] -> String -- -> [(String, Bool)] -> String
+genFSM inputSigns outputSigns internalSigns arcStrs allSigns =
+     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs) -- (unwords marks)
     where
-        allSigns = output initStrs
+        --allSigns = output initStrs
         outs = map show outputSigns
         ins = map show inputSigns
         ints = map show internalSigns
         --allArcs = concatMap consistencyLoop allSigns ++ arcStrs
-        marks = initVals allSigns initStrs
+        --marks = initVals allSigns initStrs
 
 tmpl :: String
-tmpl = unlines [".inputs %s", ".outputs %s", ".internals %s", ".state graph", "%s.marking{%s}", ".end"]
+tmpl = unlines [".inputs %s", ".outputs %s", ".internals %s", ".state graph", "%s.marking {s0}", ".end"]
 
 fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
@@ -174,12 +194,15 @@ expandAllXs :: [FsmArcX a] -> [FsmArcX a]
 expandAllXs = concatMap expandDestX . concatMap expandSrcX
 
 -- http://stackoverflow.com/questions/5921573/convert-a-string-representing-a-binary-number-to-a-base-10-string-haskell
+-- covert string to int
 readBin :: Integral a => String -> Maybe a
 readBin = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 
+-- State encoding to Sn where n is reverse of encoding in b10
 encToInt :: [Tristate] -> Int
 encToInt enc = fromMaybe 0 ((readBin . concatMap show . reverse) enc)
 
+--
 fsmarcxToFsmarc :: FsmArcX a -> FsmArc a
 fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
     where newSourceEnc = (encToInt . srcEncx) arc
