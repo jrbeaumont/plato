@@ -78,7 +78,8 @@ translateFSM circuitName ctype signs = do
         Valid -> do
             --let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
             let allSigns = map show signs
-            let sortedArcs = concatMap handleArcs (groupSortOn snd (arcs circuit))
+            let allArcs = addConsistency (arcs circuit) signs
+            let sortedArcs = concatMap handleArcs (groupSortOn snd allArcs)
             let arcStrs = map show (createAllArcs sortedArcs)-- concatMap handleArcs (groupSortOn snd (arcs circuit))
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
@@ -86,6 +87,9 @@ translateFSM circuitName ctype signs = do
             GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs allSigns) -- initStrs)
         Invalid unused incons undef ->
             GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
+
+addConsistency :: Ord a => [([Transition a], Transition a)] -> [a] -> [([Transition a], Transition a)]
+addConsistency arcs signs = nubOrd (arcs ++ concatMap (\s -> [([rise s], fall s), ([fall s], rise s)]) signs)
 
 validate :: Eq a => [a] -> CircuitConcept a -> ValidationResult a
 validate signs circuit
@@ -208,7 +212,6 @@ readBin = fmap fst . listToMaybe . readInt 2 (`elem` "01") digitToInt
 encToInt :: [Tristate] -> Int
 encToInt enc = fromMaybe 0 ((readBin . concatMap show . reverse) enc)
 
---
 fsmarcxToFsmarc :: FsmArcX a -> FsmArc a
 fsmarcxToFsmarc arc = FsmArc newSourceEnc (transx arc) newDestEnc
     where newSourceEnc = (encToInt . srcEncx) arc

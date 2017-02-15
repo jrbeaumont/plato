@@ -32,7 +32,7 @@ translateSTG circuitName ctype signs = do
     case validate signs circuit of
         Valid -> do
             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
-            let arcStrs = concatMap handleArcs (groupSortOn snd (arcs circuit))
+            let arcStrs = nubOrd (concatMap handleArcs (groupSortOn snd (arcs circuit)))
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
