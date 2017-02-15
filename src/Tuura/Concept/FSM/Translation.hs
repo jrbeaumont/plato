@@ -16,8 +16,7 @@ import Tuura.Plato.Translation
 import qualified Language.Haskell.Interpreter as GHC
 import qualified Language.Haskell.Interpreter.Unsafe as GHC
 
--- Type aliases
--- type Causality a = [([Transition a], Transition a)]
+-- Type for "dont care" transitions
 type CausalityX a = [([TransitionX a], Transition a)]
 
 -- Transition type using Tristate. Used for initial construction of arcs.
@@ -41,8 +40,13 @@ instance Show Tristate where
     show (Tristate (Just False)) = "0"
     show (Tristate Nothing     ) = "x"
 
+triTrue :: Tristate
 triTrue = Tristate (Just True)
+
+triFalse :: Tristate
 triFalse = Tristate (Just False)
+
+triX :: Tristate
 triX = Tristate Nothing
 
 -- FSM arc type used during state expansion
@@ -67,8 +71,6 @@ data FsmArc a = FsmArc
 instance Show a => Show (FsmArc a) where
     show (FsmArc senc tran tenc) = "s" ++ show senc ++ " " ++ show tran ++ " s" ++ show tenc
 
--- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
-
 translateFSM :: (Show a, Ord a) => String -> String -> [a] -> GHC.Interpreter ()
 translateFSM circuitName ctype signs = do
     circ <- GHC.unsafeInterpret circuitName ctype
@@ -76,20 +78,18 @@ translateFSM circuitName ctype signs = do
     let circuit = apply circ
     case validate signs circuit of
         Valid -> do
-            --let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
-            let allSigns = map show signs
             let allArcs = addConsistency (arcs circuit) signs
             let sortedArcs = concatMap handleArcs (groupSortOn snd allArcs)
-            let arcStrs = map show (createAllArcs sortedArcs)-- concatMap handleArcs (groupSortOn snd (arcs circuit))
+            let arcStrs = map show (createAllArcs sortedArcs)
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
-            GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs allSigns) -- initStrs)
+            GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs)
         Invalid unused incons undef ->
             GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
 
 addConsistency :: Ord a => [([Transition a], Transition a)] -> [a] -> [([Transition a], Transition a)]
-addConsistency arcs signs = nubOrd (arcs ++ concatMap (\s -> [([rise s], fall s), ([fall s], rise s)]) signs)
+addConsistency allArcs signs = nubOrd (allArcs ++ concatMap (\s -> [([rise s], fall s), ([fall s], rise s)]) signs)
 
 validate :: Eq a => [a] -> CircuitConcept a -> ValidationResult a
 validate signs circuit
@@ -100,33 +100,21 @@ validate signs circuit
     inconsistent = filter ((==Inconsistent) . initial circuit) signs
     undef        = filter ((==Undefined) . initial circuit) signs
 
-handleArcs :: Show a => [([Transition a], Transition a)] -> [([Transition a], Transition a)]
+handleArcs :: [([Transition a], Transition a)] -> [([Transition a], Transition a)]
 handleArcs arcLists = result
         where
             effect = snd (head arcLists)
             effectCauses = map fst arcLists
             transCauses = cartesianProduct effectCauses
             result = map (\m -> (m, effect)) transCauses
-            -- n = length transCauses
-            -- arcMap = concat (map (\m -> arcPairs m effect) (zip transCauses [0..(n-1)]))
 
--- Create .sg file string
--- genFSM :: (Show a, Ord a) => [([Transition a], Transition a)] -> String
--- genFSM causality = printf tmpl (unlines showArcs) initialMarking
---     where arcs = createAllArcs causality
---           showArcs = map show arcs
---           initialMarking = "s" ++ show (srcEnc (head arcs)) -- TODO: Implement properly!
-
-genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> [String] -> String -- -> [(String, Bool)] -> String
-genFSM inputSigns outputSigns internalSigns arcStrs allSigns =
-     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs) -- (unwords marks)
+genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> String
+genFSM inputSigns outputSigns internalSigns arcStrs =
+     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs)
     where
-        --allSigns = output initStrs
         outs = map show outputSigns
         ins = map show inputSigns
         ints = map show internalSigns
-        --allArcs = concatMap consistencyLoop allSigns ++ arcStrs
-        --marks = initVals allSigns initStrs
 
 tmpl :: String
 tmpl = unlines [".inputs %s", ".outputs %s", ".internals %s", ".state graph", "%s.marking {s0}", ".end"]
@@ -146,7 +134,7 @@ toTransitionX :: Transition a -> TransitionX a
 toTransitionX = liftM2 TransitionX signal (Tristate . Just . newValue)
 
 -- Extract signal list from transition list
-onlySignals :: Eq a => [[Transition a]] -> [[a]]
+onlySignals :: [[Transition a]] -> [[a]]
 onlySignals = map (map signal)
 
 -- Find all signal names in design
@@ -167,14 +155,15 @@ encode  = map mnewValue . sortTransitions
 
 createArcs :: Ord a => [([Transition a], Transition a)] -> [FsmArcX a]
 createArcs xs = zipWith3 createArc makeSrcEncs makeDestEncs activeTransitions
-    where createArc senc tenc transx = FsmArcX senc transx tenc
+    where createArc senc tenc xTrans = FsmArcX senc xTrans tenc
           makeDestEncs = a xs
           makeSrcEncs = (a . map flipTransition) xs
           a = map (encode . fullListm) . addMissingSignals
-          flipTransition x = (fst x, (negate . snd) x)
-          negate = liftM2 Transition signal (not . newValue)
+          flipTransition x = (fst x, (invert . snd) x)
+          invert = liftM2 Transition signal (not . newValue)
           activeTransitions = (map snd .  addMissingSignals) xs
 
+replaceAtIndex :: a -> [a] -> Int -> [a]
 replaceAtIndex item ls n = a ++ (item:b)
     where (a, (_:b)) = splitAt n ls
 
@@ -186,19 +175,8 @@ expandX xs = case elemIndex triX (srcEncx xs) of
                                        (replaceAtIndex triTrue (destEncx xs) n)
                 let newFalse = makeArc (replaceAtIndex triFalse (srcEncx xs) n)
                                   (replaceAtIndex triFalse (destEncx xs) n)
-                let result = [newTrue, newFalse]
                 expandX newTrue ++ expandX newFalse
                   where makeArc s d = FsmArcX s (transx xs) d
-
--- -- Expand source state so no X's remain
--- expandX :: FsmArcX a -> [FsmArcX a]
--- expandX xs = case elemIndex triX (srcEncx xs) of
---                Nothing -> [xs]
---                Just n  -> [makeArc (replaceAtIndex triTrue (srcEncx xs) n)
---                                    (replaceAtIndex triTrue (destEncx xs) n),
---                            makeArc (replaceAtIndex triFalse (srcEncx xs) n)
---                                    (replaceAtIndex triFalse (destEncx xs) n)]
---                                where makeArc s d = FsmArcX s (transx xs) d
 
 expandAllXs :: [FsmArcX a] -> [FsmArcX a]
 expandAllXs = concatMap expandX

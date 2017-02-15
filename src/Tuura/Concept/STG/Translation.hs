@@ -1,6 +1,5 @@
 module Tuura.Concept.STG.Translation where
 
--- import Data.Char
 import Data.List.Extra
 import Text.Printf
 
@@ -10,19 +9,6 @@ import Tuura.Concept.STG
 
 import qualified Language.Haskell.Interpreter as GHC
 import qualified Language.Haskell.Interpreter.Unsafe as GHC
-
--- data Signal = Signal Int deriving Eq
-
--- instance Show Signal where
---     show (Signal i)
---         | i < 26    = [chr (ord 'A' + i)]
---         | otherwise = 'S' : show i
-
--- instance Ord Signal
---     where
---         compare (Signal x) (Signal y) = compare x y
-
--- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
 
 translateSTG :: (Show a, Ord a) => String -> String -> [a] -> GHC.Interpreter ()
 translateSTG circuitName ctype signs = do
@@ -51,27 +37,6 @@ handleArcs arcLists = addConsistencyTrans effect n ++ concatMap transition arcMa
             n = length transCauses
             arcMap = concat (map (\m -> arcPairs m effect) (zip transCauses [0..(n-1)]))
 
--- translateSTG :: (Show a, Ord a) => [a] -> CircuitConcept a -> String
--- translateSTG signs circuit = do
---     case validate signs circuit of
---         Valid -> do
---             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
---             let arcStrs = concatMap handleArcs (groupSortOn snd (arcs circuit))
---             let inputSigns = filter ((==Input) . interface circuit) signs
---             let outputSigns = filter ((==Output) . interface circuit) signs
---             let internalSigns = filter ((==Internal) . interface circuit) signs
---             genSTG inputSigns outputSigns internalSigns arcStrs initStrs
---         Invalid unused incons undef -> "Error. \n" ++ addErrors unused incons undef
-
--- addErrors :: (Eq a, Show a) => [a] -> [a] -> [a] -> String
--- addErrors unused incons undef = un ++ ic ++ ud
---   where
---     un = if (unused /= []) then ("The following signals are not declared as input, output or internal: \n" ++ unlines (map show unused) ++ "\n") else ""
---     ic = if (unused /= []) then ("The following signals have inconsistent inital states: \n" ++ unlines (map show incons) ++ "\n") else ""
---     ud = if (undef  /= []) then ("The following signals have undefined initial states: \n" ++ unlines (map show undef) ++ "\n") else ""
-
--- data ValidationResult a = Valid | Invalid [a] [a] [a] deriving Eq
-
 validate :: Eq a => [a] -> CircuitConcept a -> ValidationResult a
 validate signs circuit
     | unused ++ inconsistent ++ undef == [] = Valid
@@ -80,8 +45,6 @@ validate signs circuit
     unused       = filter ((==Unused) . interface circuit) signs
     inconsistent = filter ((==Inconsistent) . initial circuit) signs
     undef        = filter ((==Undefined) . initial circuit) signs
-
-
 
 genSTG :: Show a => [a] -> [a] -> [a] -> [String] -> [(String, Bool)] -> String
 genSTG inputSigns outputSigns internalSigns arcStrs initStrs =
@@ -128,14 +91,3 @@ initVal s ls = sum (map (\x -> if (fst x == s) then fromEnum (snd x) else 0) ls)
 
 readArc :: String -> String -> [String]
 readArc f t = [f ++ " " ++ t, t ++ " " ++ f]
-
--- translate :: Bool -> [Signal] -> CircuitConcept Signal -> IO ()
--- translate transFSM signs circuit = do
---     if transFSM then do
---         let translation = liftIO $ putStr $ translateFSM signs circuit
---         (_, _) <- liftIO $ runSimulationFSM translation (FSM.State $ const False)
---         return ()
---     else do
---         let translation = liftIO $ putStr $ translateSTG signs circuit
---         (_, _) <- liftIO $ runSimulationSTG translation (STG.State $ const False)
---         return ()
