@@ -76,24 +76,27 @@ translateFSM circuitName ctype signs = do
     circ <- GHC.unsafeInterpret circuitName ctype
     apply <- GHC.unsafeInterpret "apply" $ "(" ++ ctype ++ ") -> CircuitConcept Signal"
     let circuit = apply circ
+    GHC.liftIO $ putStr (translate circuit signs)
+
+translate :: (Show a, Ord a) => CircuitConcept a -> [a] -> String
+translate circuit signs =
     case validate signs circuit of
-        Valid -> do
-            let allArcs = addConsistency (arcs circuit) signs
-            let sortedArcs = concatMap handleArcs (groupSortOn snd allArcs)
-            let arcStrs = map show (createAllArcs sortedArcs)
-            let inputSigns = filter ((==Input) . interface circuit) signs
-            let outputSigns = filter ((==Output) . interface circuit) signs
-            let internalSigns = filter ((==Internal) . interface circuit) signs
-            let initialState = getInitialState circuit signs
-            GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs initialState)
-        Invalid unused incons undef ->
-            GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
+      Valid -> do
+          let allArcs = addConsistency (arcs circuit) signs
+          let sortedArcs = concatMap handleArcs (groupSortOn snd allArcs)
+          let arcStrs = map show (createAllArcs sortedArcs)
+          let inputSigns = filter ((==Input) . interface circuit) signs
+          let outputSigns = filter ((==Output) . interface circuit) signs
+          let internalSigns = filter ((==Internal) . interface circuit) signs
+          let initialState = getInitialState circuit signs
+          genFSM inputSigns outputSigns internalSigns arcStrs initialState
+      Invalid unused incons undef ->
+          "Error. \n" ++ addErrors unused incons undef
 
 getInitialState :: CircuitConcept a -> [a] -> String
 getInitialState circuit signs = show (encToInt state)
   where
     state = map (\s -> if (getDefined $ initial circuit s) then triTrue else triFalse) signs
-
 
 addConsistency :: Ord a => [([Transition a], Transition a)] -> [a] -> [([Transition a], Transition a)]
 addConsistency allArcs signs = nubOrd (allArcs ++ concatMap (\s -> [([rise s], fall s), ([fall s], rise s)]) signs)

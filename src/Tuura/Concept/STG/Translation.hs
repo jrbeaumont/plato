@@ -15,6 +15,10 @@ translateSTG circuitName ctype signs = do
     circ <- GHC.unsafeInterpret circuitName ctype
     apply <- GHC.unsafeInterpret "apply" $ "(" ++ ctype ++ ") -> CircuitConcept Signal"
     let circuit = apply circ
+    GHC.liftIO $ putStr (translate circuit signs)
+
+translate :: (Show a, Ord a) => CircuitConcept a -> [a] -> String
+translate circuit signs =
     case validate signs circuit of
         Valid -> do
             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
@@ -22,11 +26,10 @@ translateSTG circuitName ctype signs = do
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
-            GHC.liftIO $ putStr (genSTG inputSigns outputSigns internalSigns arcStrs initStrs)
-            return ()
+            genSTG inputSigns outputSigns internalSigns arcStrs initStrs
         Invalid unused incons undef -> do
-            GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
-            return ()
+            "Error. \n" ++ addErrors unused incons undef
+
 
 handleArcs :: Show a => [([Transition a], Transition a)] -> [String]
 handleArcs arcLists = addConsistencyTrans effect n ++ concatMap transition arcMap
