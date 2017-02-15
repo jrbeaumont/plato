@@ -84,9 +84,16 @@ translateFSM circuitName ctype signs = do
             let inputSigns = filter ((==Input) . interface circuit) signs
             let outputSigns = filter ((==Output) . interface circuit) signs
             let internalSigns = filter ((==Internal) . interface circuit) signs
-            GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs)
+            let initialState = getInitialState circuit signs
+            GHC.liftIO $ putStr (genFSM inputSigns outputSigns internalSigns arcStrs initialState)
         Invalid unused incons undef ->
             GHC.liftIO $ putStr ("Error. \n" ++ addErrors unused incons undef)
+
+getInitialState :: CircuitConcept a -> [a] -> String
+getInitialState circuit signs = show (encToInt state)
+  where
+    state = map (\s -> if (getDefined $ initial circuit s) then triTrue else triFalse) signs
+
 
 addConsistency :: Ord a => [([Transition a], Transition a)] -> [a] -> [([Transition a], Transition a)]
 addConsistency allArcs signs = nubOrd (allArcs ++ concatMap (\s -> [([rise s], fall s), ([fall s], rise s)]) signs)
@@ -108,16 +115,16 @@ handleArcs arcLists = result
             transCauses = cartesianProduct effectCauses
             result = map (\m -> (m, effect)) transCauses
 
-genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> String
-genFSM inputSigns outputSigns internalSigns arcStrs =
-     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs)
+genFSM :: Show a => [a] -> [a] -> [a] -> [String] -> String -> String
+genFSM inputSigns outputSigns internalSigns arcStrs initialState =
+     printf tmpl (unwords ins) (unwords outs) (unwords ints) (unlines arcStrs) initialState
     where
         outs = map show outputSigns
         ins = map show inputSigns
         ints = map show internalSigns
 
 tmpl :: String
-tmpl = unlines [".inputs %s", ".outputs %s", ".internals %s", ".state graph", "%s.marking {s0}", ".end"]
+tmpl = unlines [".inputs %s", ".outputs %s", ".internals %s", ".state graph", "%s.marking {s%s}", ".end"]
 
 fullList :: ([a], a) -> [a]
 fullList (l,t) = t:l
