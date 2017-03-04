@@ -19,10 +19,10 @@ translateSTG circuitName ctype signs = do
 
 translate :: (Show a, Ord a) => CircuitConcept a -> [a] -> String
 translate circuit signs =
-    case validate signs circuit of
+    case validate signs circuit sortedCause of
         Valid -> do
             let initStrs = map (\s -> (show s, (getDefined $ initial circuit s))) signs
-                arcStrs = nubOrd (concatMap handleArcs (groupSortOn snd (arcs circuit)))
+                arcStrs = nubOrd (concatMap genArcStrs (groupSortOn snd (sortedCause)))
                 invStrs = map genInvStrs (invariant circuit)
                 inputSigns = filter ((==Input) . interface circuit) signs
                 outputSigns = filter ((==Output) . interface circuit) signs
@@ -30,15 +30,23 @@ translate circuit signs =
             genSTG inputSigns outputSigns internalSigns arcStrs initStrs invStrs
         Invalid errs ->
             "Error. \n" ++ addErrors errs
+    where
+        sortedCause = concatMap handleArcs (groupSortOn snd (arcs circuit))
 
-handleArcs :: Show a => [([Transition a], Transition a)] -> [String]
-handleArcs arcLists = addConsistencyTrans effect n ++ concatMap transition arcMap
+handleArcs :: [([Transition a], Transition a)] -> [([Transition a], Transition a)]
+handleArcs arcLists = map (\c -> (c, effect)) transCauses
         where
             effect = snd (head arcLists)
             effectCauses = map fst arcLists
             transCauses = cartesianProduct effectCauses
-            n = length transCauses
-            arcMap = concat (map (\m -> arcPairs m effect) (zip transCauses [0..(n-1)]))
+
+genArcStrs :: Show a => [([Transition a], Transition a)] -> [String]
+genArcStrs xs = addConsistencyTrans effect n ++ concatMap transition arcMap
+        where
+            effect = snd (head xs)
+            n = length xs
+            effectCauses = map fst xs
+            arcMap = concat (map (\m -> arcPairs m effect) (zip effectCauses [0..(n-1)]))
 
 genSTG :: Show a => [a] -> [a] -> [a] -> [String] -> [(String, Bool)] -> [String] -> String
 genSTG inputSigns outputSigns internalSigns arcStrs initStrs invStrs =

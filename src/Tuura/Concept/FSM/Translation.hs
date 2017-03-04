@@ -81,10 +81,9 @@ translateFSM circuitName ctype signs = do
 
 translate :: (Show a, Ord a) => CircuitConcept a -> [a] -> String
 translate circuit signs =
-    case validate signs circuit of
+    case validate signs circuit sortedForValidation of
       Valid -> do
-          let allCause = addConsistency (arcs circuit) signs
-              sortedCause = concatMap handleArcs (groupSortOn snd allCause)
+          let sortedCause = concatMap handleArcs (groupSortOn snd allCause)
               initialState = getInitialState circuit signs
               allArcs = createAllArcs sortedCause
               reachables = findReachables allArcs initialState
@@ -93,15 +92,14 @@ translate circuit signs =
               inputSigns = filter ((==Input) . interface circuit) signs
               outputSigns = filter ((==Output) . interface circuit) signs
               internalSigns = filter ((==Internal) . interface circuit) signs
-              reachableInvariants = filter (`elem` reachables) invariants
               unreachables = ([0..2^(length signs) - 1] \\ invariants) \\ reachables
-          if (reachableInvariants /= [])
-              then reachableInvariantStateError reachableInvariants
-            else do
-              let reachReport = genReachReport unreachables
-              genFSM inputSigns outputSigns internalSigns (map show reachableArcs) (show initialState) reachReport
+          let reachReport = genReachReport unreachables
+          genFSM inputSigns outputSigns internalSigns (map show reachableArcs) (show initialState) reachReport
       Invalid errs ->
           "Error. \n" ++ addErrors errs
+    where
+      sortedForValidation = concatMap handleArcs (groupSortOn snd (arcs circuit))
+      allCause = addConsistency (arcs circuit) signs
 
 getInitialState :: CircuitConcept a -> [a] -> Int
 getInitialState circuit signs = encToInt state
