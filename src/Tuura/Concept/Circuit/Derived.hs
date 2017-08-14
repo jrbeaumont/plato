@@ -2,7 +2,7 @@ module Tuura.Concept.Circuit.Derived (
     module Tuura.Boolean,
     State (..), Transition (..),
     rise, fall, toggle, oldValue, before, after,
-    CircuitConcept, dual, bubble,
+    CircuitConcept, dual, bubble, enable,
     consistency, initialise,
     initialise0, initialise1,
     (~>), (~|~>), (~&~>),
@@ -120,8 +120,14 @@ bubble s c = mempty
                 invariant = fmap (bubbleInvariant s) (invariant c)
              }
 
--- Signal-level concepts
+-- Apply enable signal to given concepts
+enable :: CircuitConcept a -> Transition a -> CircuitConcept a
+enable c e = c <> addEnables
+  where
+    addEnables = mconcat $ map (\(Causality _ effect) -> e ~> effect) causes
+    causes     = arcs c
 
+-- Signal-level concepts
 consistency :: CircuitConcept a
 consistency = mempty
 
